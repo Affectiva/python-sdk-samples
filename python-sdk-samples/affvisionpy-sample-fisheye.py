@@ -1,5 +1,9 @@
 # !/usr/bin/env python3.5
-import TIS
+try:
+    import TIS
+except ImportError:
+    print("TIS module is not imported")
+
 import argparse
 import csv
 import sys
