@@ -241,6 +241,17 @@ def draw_metric_with_text(destination_img, x, y, key, val):
     cv2.putText(destination_img, descriptor, (x + 50, y + 5), cv2.FONT_HERSHEY_PLAIN, 1.25, (0,0,0), thickness=5)
     cv2.putText(destination_img, descriptor, (x + 50, y + 5), cv2.FONT_HERSHEY_PLAIN, 1.25, (255,255,255), thickness=2)
 
+def visualize_identity(id):
+	if id == -1:
+		return "UNKNOWN"
+	else:
+		return string(id)
+
+def visualize_age(age):
+	if age == -1:
+		return "UNKNOWN"
+	else:
+		return string(age)
 
 def write_metrics(frame):
     """
@@ -260,13 +271,13 @@ def write_metrics(frame):
         left_x, upper_y, right_x, lower_y = get_bounding_box_points(fid)
 
         # draw identity
-        draw_metric_with_text(frame, right_x, upper_y, "identity", identity_metric.identity)
+        draw_metric_with_text(frame, right_x, upper_y, "identity", visualize_identity(identity_metric.identity))
         upper_y += 25
         draw_metric_with_bar(frame, right_x, upper_y, "identity_confidence", identity_metric.confidence)
         upper_y += 25
 
         #draw age
-        draw_metric_with_text(frame, right_x, upper_y, "age", age_metric.age_metric)
+        draw_metric_with_text(frame, right_x, upper_y, "age", visualize_age(age_metric.age_metric))
         upper_y += 25
         draw_metric_with_bar(frame, right_x, upper_y, "age_confidence", age_metric.confidence)
         upper_y += 25
