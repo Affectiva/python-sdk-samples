@@ -245,13 +245,13 @@ def visualize_identity(id):
 	if id == -1:
 		return "UNKNOWN"
 	else:
-		return string(id)
+		return str(id)
 
 def visualize_age(age):
 	if age == -1:
 		return "UNKNOWN"
 	else:
-		return string(age)
+		return str(age)
 
 def write_metrics(frame):
     """
@@ -361,7 +361,7 @@ def run(csv_data):
             captureFile.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
             #If cv2 silently fails, default to 1280 x 720 instead of 640 x 480
             if captureFile.get(3) != frame_width or captureFile.get(4) != frame_height:
-                print(frame_width, "x", frame_height, "is an unsupported resolution, defaulting to 1920 x 1080")
+                print(captureFile.get(3), "x", captureFile.get(4) "is an unsupported resolution, defaulting to 1920 x 1080")
                 cv2.resizeWindow('Processed Frame',DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT)
                 captureFile.set(cv2.CAP_PROP_FRAME_HEIGHT, DEFAULT_FRAME_HEIGHT)
                 captureFile.set(cv2.CAP_PROP_FRAME_WIDTH, DEFAULT_FRAME_WIDTH)
