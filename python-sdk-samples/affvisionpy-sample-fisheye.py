@@ -253,6 +253,34 @@ def visualize_age(age):
 	else:
 		return str(age)
 
+
+
+def visualize_adult_bucket(age):
+    if age >= 18 and age <36:
+        return "Adult(18-36)"
+    elif age >= 36 and age < 55:
+        return "Adult(36-55)"
+    elif age >= 55 and age < 76:
+        return "Adult(55-76)"
+    else: 
+        return "Adult(76+)"
+
+def visualize_age_category(age_category, age):
+    print(type(age_category))
+    if age_category == af.AgeCategory.unknown:
+        return "UNKNOWN"
+    elif age_category == af.AgeCategory.baby:
+        return "Baby"
+    elif age_category == af.AgeCategory.child:
+        return "Child"
+    elif age_category == af.AgeCategory.teen:
+        return "Teen"
+    else:
+        return visualize_adult_bucket(age)
+
+
+
+
 def write_metrics(frame):
     """
     write id, id_confidence, age, age_confidence, age_category on screen
@@ -283,7 +311,7 @@ def write_metrics(frame):
         upper_y += 25
 
         #draw age_category
-        draw_metric_with_text(frame, right_x, upper_y, "age_category", age_category)
+        draw_metric_with_text(frame, right_x, upper_y, "age_category", visualize_age_category(age_category, age_metric.age_metric))
 
 
 
@@ -361,7 +389,7 @@ def run(csv_data):
             captureFile.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
             #If cv2 silently fails, default to 1280 x 720 instead of 640 x 480
             if captureFile.get(3) != frame_width or captureFile.get(4) != frame_height:
-                print(captureFile.get(3), "x", captureFile.get(4) "is an unsupported resolution, defaulting to 1920 x 1080")
+                print(captureFile.get(3), "x", captureFile.get(4), "is an unsupported resolution, defaulting to 1920 x 1080")
                 cv2.resizeWindow('Processed Frame',DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT)
                 captureFile.set(cv2.CAP_PROP_FRAME_HEIGHT, DEFAULT_FRAME_HEIGHT)
                 captureFile.set(cv2.CAP_PROP_FRAME_WIDTH, DEFAULT_FRAME_WIDTH)
