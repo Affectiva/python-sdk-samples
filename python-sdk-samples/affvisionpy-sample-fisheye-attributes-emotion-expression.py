@@ -22,7 +22,7 @@ import math
 NOT_A_NUMBER = 'nan'
 count = 0
 TEXT_SIZE = 0.6
-PADDING_FOR_SEPARATOR = 5
+PADDING_FOR_SEPARATOR = 10
 THRESHOLD_VALUE_FOR_EMOTIONS = 5
 DECIMAL_ROUNDING_FACTOR = 2
 DEFAULT_FRAME_WIDTH = 1920
@@ -321,8 +321,10 @@ def write_metrics(frame):
 
         for key, val in expressions.items():
         	if key in activated_expressions:
-        		print (key, str(val))
-        		display_emotions_on_screen(key, val, upper_left_y, frame, upper_left_x)
+        		if key == af.affvisionpy.Expression.blink:
+        			display_measurements_on_screen(key, val, upper_left_y, frame, upper_left_x)
+        		else:
+        			display_emotions_on_screen(key, val, upper_left_y, frame, upper_left_x)
         		upper_left_y += 25
 
 
@@ -375,7 +377,11 @@ def display_measurements_on_screen(key, val, upper_left_y, frame, x1):
     cv2.putText(frame, key_name + ": ", (abs(x1 - key_val_width - PADDING_FOR_SEPARATOR), upper_left_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 TEXT_SIZE,
-                (255, 255, 255))
+                (0, 0, 0), 4, cv2.LINE_AA)
+    cv2.putText(frame, key_name + ": ", (abs(x1 - key_val_width - PADDING_FOR_SEPARATOR), upper_left_y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                TEXT_SIZE,
+                (255, 255, 255), 2, cv2.LINE_AA)
     cv2.putText(frame, val_text, (abs(x1 - val_text_width), upper_left_y),
                 cv2.FONT_HERSHEY_SIMPLEX, TEXT_SIZE,
                 (255, 255, 255))
@@ -404,7 +410,7 @@ def display_emotions_on_screen(key, val, upper_left_y, frame, x1):
 	cv2.putText(frame, key_name + ": ", (abs(x1 - key_val_width), upper_left_y),
 	            cv2.FONT_HERSHEY_SIMPLEX,
 	            TEXT_SIZE,
-	            (0, 0,0), 4, cv2.LINE_AA)
+	            (0, 0, 0), 4, cv2.LINE_AA)
 	cv2.putText(frame, key_name + ": ", (abs(x1 - key_val_width), upper_left_y),
 	            cv2.FONT_HERSHEY_SIMPLEX,
 	            TEXT_SIZE,
