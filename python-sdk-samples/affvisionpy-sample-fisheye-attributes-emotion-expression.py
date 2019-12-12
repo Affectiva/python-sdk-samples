@@ -69,7 +69,10 @@ class Listener(af.ImageListener):
         timestamp = time_metrics_dict['timestamp']
         capture_fps = time_metrics_dict['cfps']
         global count
-        process_fps = 1000.0 / (image.timestamp() - process_last_ts + 1)
+        if image.timestamp() == process_last_ts:
+        	process_fps = 0
+        else:
+        	process_fps = 1000.0 / (image.timestamp() - process_last_ts)
         print("timestamp:" + str(round(timestamp, 0)), "Frame " + str(count), "cfps: " + str(round(capture_fps, 0)), "pfps: " + str(round(process_fps, 0)))
         count += 1
         process_last_ts = image.timestamp()
@@ -100,7 +103,10 @@ class Listener(af.ImageListener):
 
     def image_captured(self, image):
         global capture_last_ts
-        capture_fps = 1000.0 / (image.timestamp() - capture_last_ts)
+        if image.timestamp() == capture_last_ts:
+        	capture_fps = 0
+        else:
+        	capture_fps = 1000.0 / (image.timestamp() - capture_last_ts)
         time_metrics_dict['cfps'] = capture_fps
         capture_last_ts = image.timestamp()
 
@@ -552,7 +558,8 @@ def run(csv_data):
                 if isinstance(input_file, int):
                     timestamp = (time.time() - start_time) * 1000.0
                 else:
-                    timestamp = int(captureFile.get(cv2.CAP_PROP_POS_MSEC))
+                	print(captureFile.get(cv2.CAP_PROP_POS_MSEC))
+                	timestamp = int(captureFile.get(cv2.CAP_PROP_POS_MSEC))
                 time_metrics_dict['timestamp'] = timestamp #.put(timestamp)
                 afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(timestamp))
                 count += 1
