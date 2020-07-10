@@ -36,7 +36,7 @@ capture_last_ts = 0.0
 header_row = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence', 'interocular_distance',
         'pitch', 'yaw', 'roll', 'joy', 'anger', 'surprise', 'valence', 'fear', 'sadness', 'disgust', 'neutral', 'smile',
         'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure', 'cheek_raise', 'yawn',
-        'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor'
+        'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor', 'lid_tighten'
         ]
  
 measurements_dict = defaultdict()
@@ -412,6 +412,8 @@ def write_metrics(frame):
         box_width = lower_right_x - upper_left_x
         upper_right_x = upper_left_x + box_width
         upper_right_y = upper_left_y
+
+        print(expressions)
  
         for key, val in measurements.items():
             display_measurements_on_screen(key, val, upper_left_y, frame, upper_left_x)
