@@ -57,3 +57,6 @@ Run the script with a video file and save output video a file named metrics.avi
 For the video option, a CSV file is written with the metrics. By default, the CSV file will be named with the same name as the video file.
 
 For both video and webcam options, the script displays real-time metrics on the screen.
+
+For the video option, the synchronous version of affvisionpy's FrameDetector will be used (SyncFrameDetector). 
+For the webcam option, the asynchronous version will be used (FrameDetector).
