@@ -11,7 +11,6 @@ import cv2 as cv2
 import math
  
  
- 
 # Constants
 NOT_A_NUMBER = 'nan'
 count = 0
@@ -32,11 +31,11 @@ process_last_ts = 0.0
 capture_last_ts = 0.0
  
  
- 
 header_row = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence', 'interocular_distance',
         'pitch', 'yaw', 'roll', 'joy', 'anger', 'surprise', 'valence', 'fear', 'sadness', 'disgust', 'neutral', 'smile',
         'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure', 'cheek_raise', 'yawn',
-        'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor'
+        'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor', 'lid_tighten', 'contempt',
+        'face_identity', 'identity_name'
         ]
  
 measurements_dict = defaultdict()
@@ -45,6 +44,7 @@ emotions_dict = defaultdict()
 bounding_box_dict = defaultdict()
 time_metrics_dict = defaultdict()
 num_faces = defaultdict()
+identity_name = ""
  
  
  
@@ -55,6 +55,7 @@ class Listener(af.ImageListener):
     """
     def __init__(self):
         super(Listener, self).__init__()
+        self.shid = {}
  
     def results_updated(self, faces, image):
         global process_last_ts
@@ -73,17 +74,18 @@ class Listener(af.ImageListener):
         global num_faces
         num_faces = faces
         for fid, face in faces.items():
-            measurements_dict[face.get_id()] = defaultdict()
-            expressions_dict[face.get_id()] = defaultdict()
-            emotions_dict[face.get_id()] = defaultdict()
-            measurements_dict[face.get_id()].update(face.get_measurements())
-            expressions_dict[face.get_id()].update(face.get_expressions())
-            emotions_dict[face.get_id()].update(face.get_emotions())
-            bounding_box_dict[face.get_id()] = [face.get_bounding_box()[0].x,
+            measurements_dict[fid] = defaultdict()
+            expressions_dict[fid] = defaultdict()
+            emotions_dict[fid] = defaultdict()
+            measurements_dict[fid].update(face.get_measurements())
+            expressions_dict[fid].update(face.get_expressions())
+            emotions_dict[fid].update(face.get_emotions())
+            bounding_box_dict[fid] = [face.get_bounding_box()[0].x,
                                                 face.get_bounding_box()[0].y,
                                                 face.get_bounding_box()[1].x,
                                                 face.get_bounding_box()[1].y,
                                                 face.get_confidence()]
+            self.shid[fid] = face.get_identity().identity
  
     def image_captured(self, image):
         global capture_last_ts
@@ -131,9 +133,10 @@ def get_command_line_parameters(parser, args):
     max_num_of_faces = int(args.num_faces)
     output_file = args.output
     csv_file = args.file
+    identity = int(args.identity)
     frame_width = int(args.res[WIDTH])
     frame_height= int(args.res[HEIGHT])
-    return input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height
+    return input_file, data, max_num_of_faces, csv_file, output_file, identity, frame_width, frame_height
  
  
  
@@ -390,10 +393,54 @@ def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame,
     cv2.putText(frame, " :" + str(key_name), (upper_right_x + val_rect_width, upper_right_y), cv2.FONT_HERSHEY_DUPLEX,
                 TEXT_SIZE,
                 (255, 255, 255), 1, cv2.LINE_AA)
+
+
+def display_identity_on_screen(frame, registered_identity, upper_left_y, upper_left_x):
+    """
+        Display the face identity metrics on screen.
+
+            Parameters
+            ----------
+            frame: affvisionpy.Frame
+                Frame object to write the measurement on
+            registered_identity: int
+                face_id of the occupant in the current frame
+            upper_left_x: int
+                the upper_left_x co-ordinate of the bounding box
+            upper_left_y: upper_left_y co-ordinate of the bounding box whose measurements need to be written
+
+        """
+
+    data_dir = os.environ.get("AFFECTIVA_VISION_DATA_DIR")
+    upper_left_x += 25
+    faceid_map = {}
+    with open(data_dir+'/attribs/Registered_faces.csv', 'r') as file:
+        reader = csv.reader(file, delimiter='\n')
+        count = 0
+        for row in reader:
+            row = row[0].split(',')
+            if count == 0:
+                count += 1
+            else:
+                faceid_map[row[0]] = row[1]
+                count += 1
+    key_list = set()
+    for key in faceid_map.keys():
+        key_list.add(key)
+
+    if str(registered_identity) in key_list:
+        global identity_name
+        identity_name = faceid_map[str(registered_identity)]
+        id_name = "Identity " + str(registered_identity) + ": " + identity_name
+    else:
+        identity_name = "Unknown"
+        id_name = "Identity " + str(registered_identity) + ": " + identity_name
+
+    cv2.putText(frame, id_name, (upper_left_x, upper_left_y-10), cv2.FONT_HERSHEY_DUPLEX, TEXT_SIZE, (255, 255, 255),
+                1, cv2.LINE_AA)
  
  
- 
-def write_metrics(frame):
+def write_metrics(frame, registered_id, identity):
     """
     write measurements, emotions, expressions on screen
  
@@ -412,10 +459,12 @@ def write_metrics(frame):
         box_width = lower_right_x - upper_left_x
         upper_right_x = upper_left_x + box_width
         upper_right_y = upper_left_y
- 
+
+        if identity == 1:
+            display_identity_on_screen(frame, registered_id[fid], upper_left_y, upper_left_x)
+
         for key, val in measurements.items():
             display_measurements_on_screen(key, val, upper_left_y, frame, upper_left_x)
- 
             upper_left_y += 25
  
         for key, val in emotions.items():
@@ -424,9 +473,8 @@ def write_metrics(frame):
  
         for key, val in expressions.items():
             display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame, upper_left_y)
- 
             upper_right_y += 25
- 
+
  
  
 def run(csv_data):
@@ -440,15 +488,15 @@ def run(csv_data):
     """
     global num_faces
     parser, args = parse_command_line()
-    input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height = get_command_line_parameters(parser, args)
+    input_file, data, max_num_of_faces, csv_file, output_file, identity, frame_width, frame_height = get_command_line_parameters(parser, args)
     if isinstance(input_file, int):
         start_time = time.time()
     detector = af.SyncFrameDetector(data, max_num_of_faces)
  
-    detector.enable_features({af.Feature.expressions, af.Feature.emotions})
+    detector.enable_features({af.Feature.expressions, af.Feature.emotions, af.Feature.identity})
  
-    list = Listener()
-    detector.set_image_listener(list)
+    listener = Listener()
+    detector.set_image_listener(listener)
  
     detector.start()
  
@@ -486,7 +534,7 @@ def run(csv_data):
         # Capture frame-by-frame
         ret, frame = captureFile.read()
  
-        if ret == True:
+        if ret:
              
             height = frame.shape[0]
             width = frame.shape[1]
@@ -506,12 +554,13 @@ def run(csv_data):
  
                 except Exception as exp:
                     print(exp)
-                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0))
+                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0), listener, identity)
  
                 if len(num_faces) > 0 and not check_bounding_box_outside(width, height):
                     draw_bounding_box(frame)
                     draw_affectiva_logo(frame, width, height)
-                    write_metrics(frame)
+                    write_metrics(frame, listener.shid, identity)
+                    listener.shid = {}
                     cv2.imshow('Processed Frame', frame)
                 else:
                     draw_affectiva_logo(frame, width, height)
@@ -608,7 +657,7 @@ def check_bounding_box_outside(width, height):
  
  
  
-def write_metrics_to_csv_data_list(csv_data, timestamp):
+def write_metrics_to_csv_data_list(csv_data, timestamp, listener, identity):
     """
     Write metrics per frame to a list
  
@@ -643,6 +692,13 @@ def write_metrics_to_csv_data_list(csv_data, timestamp):
                 current_frame_data[str(key).split('.')[1]] = round(val,4)
             for key,val in expressions_dict[fid].items():
                 current_frame_data[str(key).split('.')[1]] = round(val,4)
+            if identity == 1:
+                current_frame_data["face_identity"] = str(listener.shid[fid])
+                global identity_name
+                current_frame_data["identity_name"] = str(identity_name)
+            else:
+                current_frame_data["face_identity"] = NOT_A_NUMBER
+                current_frame_data["identity_name"] = NOT_A_NUMBER
             current_frame_data["confidence"] = round(bounding_box_dict[fid][4],4)
             csv_data.append(current_frame_data)
  
@@ -671,6 +727,9 @@ def parse_command_line():
     parser.add_argument("-f", "--file", dest="file", required=False, default=DEFAULT_FILE_NAME,
                         help="name of the output CSV file")
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1280, 720], help="resolution in pixels (2-values): width height")
+    parser.add_argument("--identity", dest="identity", required=False, const="1", nargs='?', default=1,
+                        help="set this parameter to 1 to turn on Face Identity metrics, set it to 0 if you want to"
+                             " turn off Face Identity metrics")
     args = parser.parse_args()
     return parser, args
  
@@ -695,7 +754,7 @@ def write_csv_data_to_file(csv_data, csv_file):
         writer = csv.DictWriter(c_file, fieldnames=header_row)
         writer.writeheader()
         for row in csv_data:
-            writer.writerow(row)
+            writer.writerows([row])
  
     c_file.close()
  
