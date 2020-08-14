@@ -13,7 +13,7 @@ This script demonstrates how to use Affectiva's affvisionpy module to process fr
 
 1. usage:
 
-        python3 affvisionpy-sample.py [-h] -d DATA [-i VIDEO] [-n NUM_FACES] [-c [CAMERA]] [-o OUTPUT] [-f FILE] [-r WIDTH HEIGHT]
+        python3 affvisionpy-sample.py [-h] -d DATA [-i VIDEO] [-n NUM_FACES] [-c [CAMERA]] [-o OUTPUT] [-f FILE] [-r WIDTH HEIGHT] [--identity]
 
         required arguments:
             -d DATA, --data DATA  path to directory containing the models. Alternatively specify path via the environment variable AFFECTIVA_VISION_DATA_DIR=/path/to/data/vision
@@ -38,6 +38,9 @@ This script demonstrates how to use Affectiva's affvisionpy module to process fr
 
 
           -r --resolution WIDTH HEIGHT   set the resolution in pixels (width, height) for the webcam. Defaults to 1280 x 720 resolution.
+          
+          
+          --idenity     set this boolean parameter to turn on Face Identity Metrics.
 
     **Note**: if only the data argument is supplied, the script defaults the run to a webcam and 1 face detection, displaying frames
     at default size of 1280 x 720. Only certain standard frame sizes are supported. For any unsupported frame sizes, the webcam frame
@@ -73,6 +76,10 @@ This script demonstrates how to use Affectiva's affvisionpy module to process fr
     v. Command to run the script with a webcam and save the CSV file and output video AVI file to filenames of your choice:
 
         python3 affvisionpy-sample.py -d </path/to/data/vision> -n <num_of_faces_to_detect> -i </path/to/video/file> -o <filename> -f <filename>
+        
+    vi. Command to run the script with a webcam and Face Identity Metrics:
+        
+        python3 affvisionpy-sample.py -d </path/to/data/vision> -c <camera_id> -n <num_of_faces_to_detect> --identity
 
 
 ## Additional Notes ##

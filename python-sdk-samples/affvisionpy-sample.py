@@ -133,7 +133,7 @@ def get_command_line_parameters(parser, args):
     max_num_of_faces = int(args.num_faces)
     output_file = args.output
     csv_file = args.file
-    identity = int(args.identity)
+    identity = args.identity
     frame_width = int(args.res[WIDTH])
     frame_height= int(args.res[HEIGHT])
     return input_file, data, max_num_of_faces, csv_file, output_file, identity, frame_width, frame_height
@@ -395,7 +395,7 @@ def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame,
                 (255, 255, 255), 1, cv2.LINE_AA)
 
 
-def display_identity_on_screen(frame, registered_identity, upper_left_y, upper_left_x):
+def display_identity_on_screen(frame, registered_identity, data_dir, upper_left_y, upper_left_x):
     """
         Display the face identity metrics on screen.
 
@@ -405,13 +405,13 @@ def display_identity_on_screen(frame, registered_identity, upper_left_y, upper_l
                 Frame object to write the measurement on
             registered_identity: int
                 face_id of the occupant in the current frame
+            data_dir: path to directory containing the models
+            upper_left_y: upper_left_y co-ordinate of the bounding box whose measurements need to be written
             upper_left_x: int
                 the upper_left_x co-ordinate of the bounding box
-            upper_left_y: upper_left_y co-ordinate of the bounding box whose measurements need to be written
 
         """
 
-    data_dir = os.environ.get("AFFECTIVA_VISION_DATA_DIR")
     upper_left_x += 25
     faceid_map = {}
     with open(data_dir+'/attribs/Registered_faces.csv', 'r') as file:
@@ -440,7 +440,7 @@ def display_identity_on_screen(frame, registered_identity, upper_left_y, upper_l
                 1, cv2.LINE_AA)
  
  
-def write_metrics(frame, registered_id, identity):
+def write_metrics(frame, registered_id, identity, data):
     """
     write measurements, emotions, expressions on screen
  
@@ -460,8 +460,8 @@ def write_metrics(frame, registered_id, identity):
         upper_right_x = upper_left_x + box_width
         upper_right_y = upper_left_y
 
-        if identity == 1:
-            display_identity_on_screen(frame, registered_id[fid], upper_left_y, upper_left_x)
+        if identity:
+            display_identity_on_screen(frame, registered_id[fid], data, upper_left_y, upper_left_x)
 
         for key, val in measurements.items():
             display_measurements_on_screen(key, val, upper_left_y, frame, upper_left_x)
@@ -559,7 +559,7 @@ def run(csv_data):
                 if len(num_faces) > 0 and not check_bounding_box_outside(width, height):
                     draw_bounding_box(frame)
                     draw_affectiva_logo(frame, width, height)
-                    write_metrics(frame, listener.shid, identity)
+                    write_metrics(frame, listener.shid, identity, data)
                     listener.shid = {}
                     cv2.imshow('Processed Frame', frame)
                 else:
@@ -692,7 +692,7 @@ def write_metrics_to_csv_data_list(csv_data, timestamp, listener, identity):
                 current_frame_data[str(key).split('.')[1]] = round(val,4)
             for key,val in expressions_dict[fid].items():
                 current_frame_data[str(key).split('.')[1]] = round(val,4)
-            if identity == 1:
+            if identity:
                 current_frame_data["face_identity"] = str(listener.shid[fid])
                 global identity_name
                 current_frame_data["identity_name"] = str(identity_name)
@@ -727,9 +727,7 @@ def parse_command_line():
     parser.add_argument("-f", "--file", dest="file", required=False, default=DEFAULT_FILE_NAME,
                         help="name of the output CSV file")
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1280, 720], help="resolution in pixels (2-values): width height")
-    parser.add_argument("--identity", dest="identity", required=False, const="1", nargs='?', default=1,
-                        help="set this parameter to 1 to turn on Face Identity metrics, set it to 0 if you want to"
-                             " turn off Face Identity metrics")
+    parser.add_argument("--identity", dest="identity", action='store_true', help="set this parameter to turn on Face Identity metrics")
     args = parser.parse_args()
     return parser, args
  
