@@ -39,6 +39,8 @@ This script demonstrates how to use Affectiva's affvisionpy module to process fr
 
           -r --resolution WIDTH HEIGHT   set the resolution in pixels (width, height) for the webcam. Defaults to 1280 x 720 resolution.
 
+          --sync    enable this flag to use SyncFrameDetector when using a webcam. Processing a video will automatically use SyncFrameDetector.
+
     **Note**: if only the data argument is supplied, the script defaults the run to a webcam and 1 face detection, displaying frames
     at default size of 1280 x 720. Only certain standard frame sizes are supported. For any unsupported frame sizes, the webcam frame
     size defaults to 1280 x 720. If any other configuration is required, it can be done using optional arguments.
