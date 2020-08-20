@@ -1,102 +1,68 @@
 # !/usr/bin/env python3.5
-import csv
+import cv2
 import os
-from collections import defaultdict
- 
-import affvisionpy as af
-import cv2 as cv2
 import math
 
-# Constants
-NOT_A_NUMBER = 'nan'
-count = 0
 TEXT_SIZE = 0.6
 PADDING_FOR_SEPARATOR = 5
 THRESHOLD_VALUE_FOR_EMOTIONS = 5
-DEFAULT_FRAME_WIDTH = 1280
-DEFAULT_FRAME_HEIGHT = 720
-DEFAULT_FILE_NAME = "default"
-DATA_DIR_ENV_VAR = "AFFECTIVA_VISION_DATA_DIR"
- 
-#Argparse Variable Constants
-WIDTH = 0
-HEIGHT = 1
- 
-process_last_ts = 0.0
-capture_last_ts = 0.0
- 
-header_row = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence', 'interocular_distance',
-        'pitch', 'yaw', 'roll', 'joy', 'anger', 'surprise', 'valence', 'fear', 'sadness', 'disgust', 'neutral', 'contempt', 'smile',
-        'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure', 'cheek_raise', 'yawn',
-        'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor'
-        ]
- 
 
-class Listener(af.ImageListener):
+def draw_metrics(frame, listener_metrics):
     """
-    Listener class that return metrics for processed frames.
+    write measurements, emotions, expressions on screen
+ 
+        Parameters
+        ----------
+        frame: affvisionpy.Frame
+            frame to write the metrics on
+
+        listener_metrics: dict
+            dictionary of dictionaries, gives current listener state
  
     """
-    def __init__(self):
-        super(Listener, self).__init__()
-        
-        self.measurements_dict = defaultdict()
-        self.expressions_dict = defaultdict()
-        self.emotions_dict = defaultdict()
-        self.bounding_box_dict = defaultdict()
-        self.time_metrics_dict = defaultdict()
-        self.num_faces = defaultdict()
+    for fid in listener_metrics["measurements"].keys():
+        measurements = listener_metrics["measurements"][fid]
+        expressions = listener_metrics["expressions"][fid]
+        emotions = listener_metrics["emotions"][fid]
+        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
+        box_height = lower_right_y - upper_left_y
+        box_width = lower_right_x - upper_left_x
+        upper_right_x = upper_left_x + box_width
+        upper_right_y = upper_left_y
  
-    def results_updated(self, faces, image):
-        global process_last_ts
-        timestamp = self.time_metrics_dict['timestamp']
-        capture_fps = self.time_metrics_dict['cfps']
-        global count
-        #avoid div by 0 error on the first frame
-        try:
-            process_fps = 1000.0 / (image.timestamp() - process_last_ts)
-        except:
-            process_fps = 0
-        print("timestamp:" + str(round(timestamp, 0)), "Frame " + str(count), "cfps: " + str(round(capture_fps, 0)), "pfps: " + str(round(process_fps, 0)))
-        count +=1
-        process_last_ts = image.timestamp()
-        self.faces = faces
-        # TODO: probably don't need num_faces .. 
-        self.num_faces = faces
-
-        self.clear_all_dictionaries()
-        for fid, face in faces.items():
-            self.measurements_dict[face.get_id()] = defaultdict()
-            self.expressions_dict[face.get_id()] = defaultdict()
-            self.emotions_dict[face.get_id()] = defaultdict()
-
-            self.measurements_dict[face.get_id()].update(face.get_measurements())
-            self.expressions_dict[face.get_id()].update(face.get_expressions())
-            self.emotions_dict[face.get_id()].update(face.get_emotions())
-            self.bounding_box_dict[face.get_id()] = [face.get_bounding_box()[0].x,
-                                                face.get_bounding_box()[0].y,
-                                                face.get_bounding_box()[1].x,
-                                                face.get_bounding_box()[1].y,
-                                                face.get_confidence()]
+        for key, val in measurements.items():
+            display_measurements_on_screen(key, val, upper_left_y, frame, upper_left_x)
  
-    def image_captured(self, image):
-        global capture_last_ts
-        try:
-            capture_fps = 1000.0 / (image.timestamp() - capture_last_ts)
-        except:
-            capture_fps = 0
-        self.time_metrics_dict['cfps'] = capture_fps
-        capture_last_ts = image.timestamp()
-
-    def clear_all_dictionaries(self):
-        """
-        Clears the dictionary values
-        """
-        self.measurements_dict.clear()
-        self.expressions_dict.clear()
-        self.emotions_dict.clear()
-        self.bounding_box_dict.clear()
+            upper_left_y += 25
  
+        for key, val in emotions.items():
+            display_emotions_on_screen(key, val, upper_left_y, frame, upper_left_x)
+            upper_left_y += 25
+ 
+        for key, val in expressions.items():
+            display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame, upper_left_y)
+ 
+            upper_right_y += 25
+
+
+def get_bounding_box_points(fid, bounding_box_dict):
+    """
+    Fetch upper_left_x, upper_left_y, lower_right_x, lwoer_right_y points of the bounding box.
+ 
+        Parameters
+        ----------
+        fid: int
+            face id of the face to get the bounding box for
+ 
+        Returns
+        -------
+        tuple of int values
+            tuple with upper_left_x, upper_left_y, upper_right_x, upper_right_y values
+    """
+    return (int(bounding_box_dict[fid][0]),
+            int(bounding_box_dict[fid][1]),
+            int(bounding_box_dict[fid][2]),
+            int(bounding_box_dict[fid][3]))
  
  
 def draw_bounding_box(frame, listener_metrics):
@@ -128,48 +94,7 @@ def draw_bounding_box(frame, listener_metrics):
         else:
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (21, 169, 167), 3)
  
- 
-def get_bounding_box_points(fid, bounding_box_dict):
-    """
-    Fetch upper_left_x, upper_left_y, lower_right_x, lwoer_right_y points of the bounding box.
- 
-        Parameters
-        ----------
-        fid: int
-            face id of the face to get the bounding box for
- 
-        Returns
-        -------
-        tuple of int values
-            tuple with upper_left_x, upper_left_y, upper_right_x, upper_right_y values
-    """
-    return (int(bounding_box_dict[fid][0]),
-            int(bounding_box_dict[fid][1]),
-            int(bounding_box_dict[fid][2]),
-            int(bounding_box_dict[fid][3]))
- 
- 
- 
-def roundup(num):
-    """
-    Round up the number to the nearest 10.
- 
-       Parameters
-       ----------
-       num: int
-           number to be rounded up to 10.
- 
-       Returns
-       -------
-       int
-           Rounded up value of the number to 10
-    """
-    if (num / 10.0) < 5:
-        return int(math.floor(num / 10.0)) * 10
-    return int(math.ceil(num / 10.0)) * 10
- 
- 
- 
+
 def get_text_size(text, font, thickness):
     """
     Get the size occupied by a particular text string
@@ -190,7 +115,6 @@ def get_text_size(text, font, thickness):
     """
     text_size = cv2.getTextSize(text, font, TEXT_SIZE, thickness)
     return text_size[0][0], text_size[0][1]
- 
  
  
 def display_measurements_on_screen(key, val, upper_left_y, frame, x1):
@@ -226,7 +150,6 @@ def display_measurements_on_screen(key, val, upper_left_y, frame, x1):
     cv2.putText(frame, val_text, (abs(x1 - val_text_width), upper_left_y),
                 cv2.FONT_HERSHEY_SIMPLEX, TEXT_SIZE,
                 (255, 255, 255))
- 
  
  
 def display_emotions_on_screen(key, val, upper_left_y, frame, x1):
@@ -292,7 +215,6 @@ def display_emotions_on_screen(key, val, upper_left_y, frame, x1):
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
  
  
- 
 def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame, upper_left_y):
     """
     Display the expressions metrics on screen.
@@ -355,46 +277,6 @@ def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame,
                 TEXT_SIZE,
                 (255, 255, 255), 1, cv2.LINE_AA)
  
- 
- 
-def write_metrics(frame, listener_metrics):
-    """
-    write measurements, emotions, expressions on screen
- 
-        Parameters
-        ----------
-        frame: affvisionpy.Frame
-            frame to write the metrics on
-
-        listener_metrics: dict
-            dictionary of dictionaries, gives current listener state
- 
-    """
-    for fid in listener_metrics["measurements"].keys():
-        measurements = listener_metrics["measurements"][fid]
-        expressions = listener_metrics["expressions"][fid]
-        emotions = listener_metrics["emotions"][fid]
-        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
-        box_height = lower_right_y - upper_left_y
-        box_width = lower_right_x - upper_left_x
-        upper_right_x = upper_left_x + box_width
-        upper_right_y = upper_left_y
- 
-        for key, val in measurements.items():
-            display_measurements_on_screen(key, val, upper_left_y, frame, upper_left_x)
- 
-            upper_left_y += 25
- 
-        for key, val in emotions.items():
-            display_emotions_on_screen(key, val, upper_left_y, frame, upper_left_x)
-            upper_left_y += 25
- 
-        for key, val in expressions.items():
-            display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame, upper_left_y)
- 
-            upper_right_y += 25
- 
-
 
 def draw_affectiva_logo(frame, width, height):
     """
@@ -423,8 +305,7 @@ def draw_affectiva_logo(frame, width, height):
         beta = frame[y1:y2, x1:x2, c] * (alpha)
         frame[y1:y2, x1:x2, c] = color + beta
  
- 
- 
+
 def check_bounding_box_outside(width, height, bounding_box_dict):
     """
     Check if bounding box values are going outside the screen in case of face going outside
@@ -446,68 +327,21 @@ def check_bounding_box_outside(width, height, bounding_box_dict):
             return True
         return False
  
- 
- 
-def write_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
+
+def roundup(num):
     """
-    Write metrics per frame to a list
+    Round up the number to the nearest 10.
  
-        Parameters
-        ----------
-        csv_data:
-          list of per frame values to write to
-        timestamp: int
-           timestamp of each frame
-        listener_metrics: dict
-            dictionary of dictionaries, gives current listener state
+       Parameters
+       ----------
+       num: int
+           number to be rounded up to 10.
  
+       Returns
+       -------
+       int
+           Rounded up value of the number to 10
     """
-    global header_row
-    if not listener_metrics["measurements"].keys():
-        current_frame_data = {}
-        current_frame_data["TimeStamp"] = timestamp
-        for field in header_row[1:]:
-            current_frame_data[field] = NOT_A_NUMBER
-        csv_data.append(current_frame_data)
-    else:
-        for fid in listener_metrics["measurements"].keys():
-            current_frame_data = {}
-            current_frame_data["TimeStamp"] = timestamp
-            current_frame_data["faceId"] = fid
-            upperLeftX, upperLeftY, lowerRightX, lowerRightY = get_bounding_box_points(fid, listener_metrics["bounding_box"])
-            current_frame_data["upperLeftX"] = upperLeftX
-            current_frame_data["upperLeftY"] = upperLeftY
-            current_frame_data["lowerRightX"] = lowerRightX
-            current_frame_data["lowerRightY"] = lowerRightY
-            for key,val in listener_metrics["measurements"][fid].items():
-                current_frame_data[str(key).split('.')[1]] = round(val,4)
-            for key,val in listener_metrics["emotions"][fid].items():
-                current_frame_data[str(key).split('.')[1]] = round(val,4)
-            for key,val in listener_metrics["expressions"][fid].items():
-                current_frame_data[str(key).split('.')[1]] = round(val,4)
-            current_frame_data["confidence"] = round(listener_metrics["bounding_box"][fid][4],4)
-            csv_data.append(current_frame_data)
- 
-def write_csv_data_to_file(csv_data, csv_file):
-    """
-    Place logo on the screen
- 
-        Parameters
-        ----------
-        csv_data: list
-           list to write the data from
-        csv_file: list
-           file to be written to
-    """
-    global header_row
-    if ".csv" not in csv_file:
-        csv_file = csv_file + ".csv"
-    with open(csv_file, 'w') as c_file:
-        keys = csv_data[0].keys()
-        writer = csv.DictWriter(c_file, fieldnames=header_row)
-        writer.writeheader()
-        for row in csv_data:
-            writer.writerow(row)
- 
-    c_file.close()
- 
+    if (num / 10.0) < 5:
+        return int(math.floor(num / 10.0)) * 10
+    return int(math.ceil(num / 10.0)) * 10

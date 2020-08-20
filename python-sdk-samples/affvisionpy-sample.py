@@ -3,15 +3,33 @@ import argparse
 import sys
 import os
 import time
- 
-import affvisionpy as af
-import cv2 as cv2
+import csv
 
-from common import (Listener,
-        DATA_DIR_ENV_VAR, DEFAULT_FILE_NAME, DEFAULT_FRAME_HEIGHT, DEFAULT_FRAME_WIDTH, WIDTH, HEIGHT,
-        write_metrics_to_csv_data_list, draw_affectiva_logo, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo, write_metrics)
+import affvisionpy as af
+import cv2
  
+from listener import Listener
+from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo, get_bounding_box_points)
  
+
+# Constants
+NOT_A_NUMBER = 'nan'
+DEFAULT_FRAME_WIDTH = 1280
+DEFAULT_FRAME_HEIGHT = 720
+DEFAULT_FILE_NAME = "default"
+DATA_DIR_ENV_VAR = "AFFECTIVA_VISION_DATA_DIR"
+ 
+header_row = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence', 'interocular_distance',
+        'pitch', 'yaw', 'roll', 'joy', 'anger', 'surprise', 'valence', 'fear', 'sadness', 'disgust', 'neutral', 'contempt', 'smile',
+        'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure', 'cheek_raise', 'yawn',
+        'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor'
+        ]
+ 
+#Argparse Variable Constants
+WIDTH = 0
+HEIGHT = 1
+
+
 def run(csv_data):
     """
     Starting point of the program, initializes the detector, processes a frame and then writes metrics to frame
@@ -22,11 +40,15 @@ def run(csv_data):
             Values to hold for each frame
     """
     parser, args = parse_command_line()
-    input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height = get_command_line_parameters(parser, args)
+    input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height, sync = get_command_line_parameters(parser, args)
     if isinstance(input_file, int):
-        start_time = time.time()
+        start_time = time.time()         
 
-    detector = af.SyncFrameDetector(data, max_num_of_faces)
+    if sync:
+        detector = af.SyncFrameDetector(data, max_num_of_faces)
+    else:
+        detector = af.FrameDetector(data, max_num_faces=max_num_of_faces)
+
     detector.enable_features({af.Feature.expressions, af.Feature.emotions})
  
     listener = Listener()
@@ -88,12 +110,25 @@ def run(csv_data):
  
                 except Exception as exp:
                     print(exp)
-                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0), listener)
- 
-                if len(listener.num_faces) > 0 and not check_bounding_box_outside(width, height, listener.bounding_box_dict):
-                    draw_bounding_box(frame, listener)
+
+                num_faces = listener.num_faces
+                measurements_dict = listener.measurements_dict.copy()
+                expressions_dict = listener.expressions_dict.copy()
+                emotions_dict = listener.emotions_dict.copy()
+                bounding_box_dict = listener.bounding_box_dict.copy()
+                listener_metrics = {
+                    "measurements": measurements_dict,
+                    "expressions": expressions_dict,
+                    "emotions": emotions_dict,
+                    "bounding_box": bounding_box_dict
+                }
+
+                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0), listener_metrics)
+
+                if len(num_faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
+                    draw_bounding_box(frame, listener_metrics)
                     draw_affectiva_logo(frame, width, height)
-                    write_metrics(frame, listener)
+                    draw_metrics(frame, listener_metrics)
                     cv2.imshow('Processed Frame', frame)
                 else:
                     draw_affectiva_logo(frame, width, height)
@@ -124,6 +159,71 @@ def run(csv_data):
             write_csv_data_to_file(csv_data, csv_file)
  
 
+def write_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
+    """
+    Write metrics per frame to a list
+ 
+        Parameters
+        ----------
+        csv_data:
+          list of per frame values to write to
+        timestamp: int
+           timestamp of each frame
+        listener_metrics: dict
+            dictionary of dictionaries, gives current listener state
+ 
+    """
+    global header_row
+    if not listener_metrics["measurements"].keys():
+        current_frame_data = {}
+        current_frame_data["TimeStamp"] = timestamp
+        for field in header_row[1:]:
+            current_frame_data[field] = NOT_A_NUMBER
+        csv_data.append(current_frame_data)
+    else:
+        for fid in listener_metrics["measurements"].keys():
+            current_frame_data = {}
+            current_frame_data["TimeStamp"] = timestamp
+            current_frame_data["faceId"] = fid
+            upperLeftX, upperLeftY, lowerRightX, lowerRightY = get_bounding_box_points(fid, listener_metrics["bounding_box"])
+            current_frame_data["upperLeftX"] = upperLeftX
+            current_frame_data["upperLeftY"] = upperLeftY
+            current_frame_data["lowerRightX"] = lowerRightX
+            current_frame_data["lowerRightY"] = lowerRightY
+            for key,val in listener_metrics["measurements"][fid].items():
+                current_frame_data[str(key).split('.')[1]] = round(val,4)
+            for key,val in listener_metrics["emotions"][fid].items():
+                current_frame_data[str(key).split('.')[1]] = round(val,4)
+            for key,val in listener_metrics["expressions"][fid].items():
+                current_frame_data[str(key).split('.')[1]] = round(val,4)
+            current_frame_data["confidence"] = round(listener_metrics["bounding_box"][fid][4],4)
+            csv_data.append(current_frame_data)
+ 
+
+def write_csv_data_to_file(csv_data, csv_file):
+    """
+    Place logo on the screen
+ 
+        Parameters
+        ----------
+        csv_data: list
+           list to write the data from
+        csv_file: list
+           file to be written to
+    """
+    global header_row
+    if ".csv" not in csv_file:
+        csv_file = csv_file + ".csv"
+    with open(csv_file, 'w') as c_file:
+        keys = csv_data[0].keys()
+        writer = csv.DictWriter(c_file, fieldnames=header_row)
+        writer.writeheader()
+        for row in csv_data:
+            writer.writerow(row)
+ 
+    c_file.close()
+ 
+
 def parse_command_line():
     """
     Make the options for command line
@@ -147,6 +247,7 @@ def parse_command_line():
     parser.add_argument("-f", "--file", dest="file", required=False, default=DEFAULT_FILE_NAME,
                         help="name of the output CSV file")
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1280, 720], help="resolution in pixels (2-values): width height")
+    parser.add_argument("--sync", default=False, action="store_true", help="enable to use SyncFrameProcesor (only valid if using webcam)")
     args = parser.parse_args()
     return parser, args
  
@@ -167,9 +268,11 @@ def get_command_line_parameters(parser, args):
     """
     if not args.video is None:
         input_file = args.video
+        sync = True
         if not os.path.isfile(input_file):
             raise ValueError("Please provide a valid input video file")
     else:
+        sync = args.sync if args.sync else False
         input_file = int(args.camera)
     data = args.data
     if not data:
@@ -188,7 +291,7 @@ def get_command_line_parameters(parser, args):
     csv_file = args.file
     frame_width = int(args.res[WIDTH])
     frame_height= int(args.res[HEIGHT])
-    return input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height
+    return input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height, sync
  
 
 if __name__ == "__main__":
