@@ -29,8 +29,8 @@ def run(csv_data):
     detector = af.SyncFrameDetector(data, max_num_of_faces)
     detector.enable_features({af.Feature.expressions, af.Feature.emotions})
  
-    list = Listener()
-    detector.set_image_listener(list)
+    listener = Listener()
+    detector.set_image_listener(listener)
  
     detector.start()
  
@@ -79,7 +79,7 @@ def run(csv_data):
             if timestamp>last_timestamp or count == 0: # if there's a problem with the timestamp, don't process the frame
              
                 last_timestamp = timestamp
-                list.time_metrics_dict['timestamp'] = timestamp 
+                listener.time_metrics_dict['timestamp'] = timestamp 
                 afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(timestamp))
                 count += 1
                   
@@ -88,20 +88,18 @@ def run(csv_data):
  
                 except Exception as exp:
                     print(exp)
-                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0), list)
+                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0), listener)
  
-                if len(list.num_faces) > 0 and not check_bounding_box_outside(width, height, list.bounding_box_dict):
-                    draw_bounding_box(frame, list)
+                if len(listener.num_faces) > 0 and not check_bounding_box_outside(width, height, listener.bounding_box_dict):
+                    draw_bounding_box(frame, listener)
                     draw_affectiva_logo(frame, width, height)
-                    write_metrics(frame, list)
+                    write_metrics(frame, listener)
                     cv2.imshow('Processed Frame', frame)
                 else:
                     draw_affectiva_logo(frame, width, height)
                     cv2.imshow('Processed Frame', frame)
                 if output_file is not None:
                     out.write(frame)
- 
-                list.clear_all_dictionaries()
  
                 if cv2.waitKey(1) == 27:
                     break

@@ -26,9 +26,9 @@ process_last_ts = 0.0
 capture_last_ts = 0.0
  
 header_row = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence', 'interocular_distance',
-        'pitch', 'yaw', 'roll', 'joy', 'anger', 'surprise', 'valence', 'fear', 'sadness', 'disgust', 'neutral', 'smile',
+        'pitch', 'yaw', 'roll', 'joy', 'anger', 'surprise', 'valence', 'fear', 'sadness', 'disgust', 'neutral', 'contempt', 'smile',
         'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure', 'cheek_raise', 'yawn',
-        'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor', 'lid_tighten'
+        'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor'
         ]
  
 
@@ -63,6 +63,8 @@ class Listener(af.ImageListener):
         self.faces = faces
         # TODO: probably don't need num_faces .. 
         self.num_faces = faces
+
+        self.clear_all_dictionaries()
         for fid, face in faces.items():
             self.measurements_dict[face.get_id()] = defaultdict()
             self.expressions_dict[face.get_id()] = defaultdict()
@@ -97,7 +99,7 @@ class Listener(af.ImageListener):
  
  
  
-def draw_bounding_box(frame, listener):
+def draw_bounding_box(frame, listener_metrics):
     """
     For each frame, draw the bounding box on screen.
  
@@ -105,17 +107,20 @@ def draw_bounding_box(frame, listener):
         ----------
         frame: affvisionPy.Frame
             Frame object to draw the bounding box on.
+
+        listener_metrics: dict
+            dictionary of dictionaries, gives current listener state
  
     """
-    for fid in listener.bounding_box_dict.keys():
-        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener.bounding_box_dict)
-        for key in listener.emotions_dict[fid]:
+    for fid in listener_metrics["bounding_box"].keys():
+        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
+        for key in listener_metrics["emotions"][fid]:
             if 'valence' in str(key):
-                valence_value = listener.emotions_dict[fid][key]
+                valence_value = listener_metrics["emotions"][fid][key]
             if 'anger' in str(key):
-                anger_value = listener.emotions_dict[fid][key]
+                anger_value = listener_metrics["emotions"][fid][key]
             if 'joy' in str(key):
-                joy_value = listener.emotions_dict[fid][key]
+                joy_value = listener_metrics["emotions"][fid][key]
         if valence_value < 0 and anger_value >= THRESHOLD_VALUE_FOR_EMOTIONS:
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 0, 255), 3)
         elif valence_value >= THRESHOLD_VALUE_FOR_EMOTIONS and joy_value >= THRESHOLD_VALUE_FOR_EMOTIONS:
@@ -352,7 +357,7 @@ def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame,
  
  
  
-def write_metrics(frame, listener):
+def write_metrics(frame, listener_metrics):
     """
     write measurements, emotions, expressions on screen
  
@@ -360,13 +365,16 @@ def write_metrics(frame, listener):
         ----------
         frame: affvisionpy.Frame
             frame to write the metrics on
+
+        listener_metrics: dict
+            dictionary of dictionaries, gives current listener state
  
     """
-    for fid in listener.measurements_dict.keys():
-        measurements = listener.measurements_dict[fid]
-        expressions = listener.expressions_dict[fid]
-        emotions = listener.emotions_dict[fid]
-        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener.bounding_box_dict)
+    for fid in listener_metrics["measurements"].keys():
+        measurements = listener_metrics["measurements"][fid]
+        expressions = listener_metrics["expressions"][fid]
+        emotions = listener_metrics["emotions"][fid]
+        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
         box_height = lower_right_y - upper_left_y
         box_width = lower_right_x - upper_left_x
         upper_right_x = upper_left_x + box_width
@@ -440,7 +448,7 @@ def check_bounding_box_outside(width, height, bounding_box_dict):
  
  
  
-def write_metrics_to_csv_data_list(csv_data, timestamp, listener):
+def write_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
     """
     Write metrics per frame to a list
  
@@ -450,32 +458,34 @@ def write_metrics_to_csv_data_list(csv_data, timestamp, listener):
           list of per frame values to write to
         timestamp: int
            timestamp of each frame
+        listener_metrics: dict
+            dictionary of dictionaries, gives current listener state
  
     """
     global header_row
-    if not listener.measurements_dict.keys():
+    if not listener_metrics["measurements"].keys():
         current_frame_data = {}
         current_frame_data["TimeStamp"] = timestamp
         for field in header_row[1:]:
             current_frame_data[field] = NOT_A_NUMBER
         csv_data.append(current_frame_data)
     else:
-        for fid in listener.measurements_dict.keys():
+        for fid in listener_metrics["measurements"].keys():
             current_frame_data = {}
             current_frame_data["TimeStamp"] = timestamp
             current_frame_data["faceId"] = fid
-            upperLeftX, upperLeftY, lowerRightX, lowerRightY = get_bounding_box_points(fid, listener.bounding_box_dict)
+            upperLeftX, upperLeftY, lowerRightX, lowerRightY = get_bounding_box_points(fid, listener_metrics["bounding_box"])
             current_frame_data["upperLeftX"] = upperLeftX
             current_frame_data["upperLeftY"] = upperLeftY
             current_frame_data["lowerRightX"] = lowerRightX
             current_frame_data["lowerRightY"] = lowerRightY
-            for key,val in listener.measurements_dict[fid].items():
+            for key,val in listener_metrics["measurements"][fid].items():
                 current_frame_data[str(key).split('.')[1]] = round(val,4)
-            for key,val in listener.emotions_dict[fid].items():
+            for key,val in listener_metrics["emotions"][fid].items():
                 current_frame_data[str(key).split('.')[1]] = round(val,4)
-            for key,val in listener.expressions_dict[fid].items():
+            for key,val in listener_metrics["expressions"][fid].items():
                 current_frame_data[str(key).split('.')[1]] = round(val,4)
-            current_frame_data["confidence"] = round(listener.bounding_box_dict[fid][4],4)
+            current_frame_data["confidence"] = round(listener_metrics["bounding_box"][fid][4],4)
             csv_data.append(current_frame_data)
  
 def write_csv_data_to_file(csv_data, csv_file):

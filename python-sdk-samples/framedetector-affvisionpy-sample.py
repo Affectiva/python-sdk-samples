@@ -9,7 +9,7 @@ import cv2 as cv2
  
 from common import (Listener,
         DATA_DIR_ENV_VAR, DEFAULT_FILE_NAME, DEFAULT_FRAME_HEIGHT, DEFAULT_FRAME_WIDTH, WIDTH, HEIGHT,
-        write_metrics_to_csv_data_list, draw_affectiva_logo, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo, write_metrics)
+        write_metrics_to_csv_data_list, draw_affectiva_logo, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo, write_metrics, write_csv_data_to_file)
 
 
 def run(csv_data):
@@ -89,20 +89,30 @@ def run(csv_data):
                 except Exception as exp:
                     print(exp)
 
-                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0), listener)
+                num_faces = listener.num_faces
+                measurements_dict = listener.measurements_dict.copy()
+                expressions_dict = listener.expressions_dict.copy()
+                emotions_dict = listener.emotions_dict.copy()
+                bounding_box_dict = listener.bounding_box_dict.copy()
+                listener_metrics = {
+                    "measurements": measurements_dict,
+                    "expressions": expressions_dict,
+                    "emotions": emotions_dict,
+                    "bounding_box": bounding_box_dict
+                }
 
-                if len(listener.num_faces) > 0 and not check_bounding_box_outside(width, height, listener.bounding_box_dict):
-                    draw_bounding_box(frame, listener)
+                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0), listener_metrics)
+
+                if len(num_faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
+                    draw_bounding_box(frame, listener_metrics)
                     draw_affectiva_logo(frame, width, height)
-                    write_metrics(frame, listener)
+                    write_metrics(frame, listener_metrics)
                     cv2.imshow('Processed Frame', frame)
                 else:
                     draw_affectiva_logo(frame, width, height)
                     cv2.imshow('Processed Frame', frame)
                 if output_file is not None:
                     out.write(frame)
-                
-                listener.clear_all_dictionaries()
  
                 if cv2.waitKey(1) == 27:
                     break
