@@ -17,7 +17,7 @@ run with -h or --help to see documentation for all supported arguments
  
         python3 affvisionpy-sample.py -h
 
-##Example Usages:
+## Example Usages:
 
 Run the script with a webcam.  **Note:** If the camera id is not supplied, by default the camera_id is set to 0.
     

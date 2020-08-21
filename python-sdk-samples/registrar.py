@@ -9,9 +9,6 @@
 
     The environment variable `AFFECTIVA_VISION_DATA_DIR` will be used get the data
     directory.
-TODO:
-    * Should we have a 'do you really want to do this?' message?
-      - yes we should, but we'll have to add it later
 """
 
 import csv
@@ -19,9 +16,8 @@ from argparse import ArgumentParser
 import collections
 import os
 import cv2
-from affvisionpy import affvisionpy
+import affvisionpy
 import tqdm
-import sys
 
 DATA_DIR_ENV_VAR = "AFFECTIVA_VISION_DATA_DIR"
 NO_DATA_DIR = "To manage identities you must set " + DATA_DIR_ENV_VAR + " to a valid directory"

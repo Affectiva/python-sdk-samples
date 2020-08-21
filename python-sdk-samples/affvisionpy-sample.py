@@ -468,7 +468,7 @@ def write_metrics(args, frame):
 
         if args.show_identity:
             display_identity_on_screen(frame, identities_dict[fid], upper_left_y, upper_left_x)
-            
+
         for key, val in measurements.items():
             display_measurements_on_screen(key, val, upper_left_y, frame, upper_left_x)
             upper_left_y += 25
