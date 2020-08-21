@@ -45,9 +45,9 @@ emotions_dict = defaultdict()
 bounding_box_dict = defaultdict()
 time_metrics_dict = defaultdict()
 num_faces = defaultdict()
- 
- 
- 
+identities_dict = defaultdict()
+identity_names_dict = defaultdict()
+
 class Listener(af.ImageListener):
     """
     Listener class that return metrics for processed frames.
@@ -73,18 +73,19 @@ class Listener(af.ImageListener):
         global num_faces
         num_faces = faces
         for fid, face in faces.items():
-            measurements_dict[face.get_id()] = defaultdict()
-            expressions_dict[face.get_id()] = defaultdict()
-            emotions_dict[face.get_id()] = defaultdict()
-            measurements_dict[face.get_id()].update(face.get_measurements())
-            expressions_dict[face.get_id()].update(face.get_expressions())
-            emotions_dict[face.get_id()].update(face.get_emotions())
-            bounding_box_dict[face.get_id()] = [face.get_bounding_box()[0].x,
+            measurements_dict[fid] = defaultdict()
+            expressions_dict[fid] = defaultdict()
+            emotions_dict[fid] = defaultdict()
+            measurements_dict[fid].update(face.get_measurements())
+            expressions_dict[fid].update(face.get_expressions())
+            emotions_dict[fid].update(face.get_emotions())
+            bounding_box_dict[fid] = [face.get_bounding_box()[0].x,
                                                 face.get_bounding_box()[0].y,
                                                 face.get_bounding_box()[1].x,
                                                 face.get_bounding_box()[1].y,
                                                 face.get_confidence()]
- 
+            identities_dict[fid] = face.get_identity().identity
+
     def image_captured(self, image):
         global capture_last_ts
         try:
@@ -93,9 +94,25 @@ class Listener(af.ImageListener):
             capture_fps = 0
         time_metrics_dict['cfps'] = capture_fps
         capture_last_ts = image.timestamp()
- 
- 
- 
+
+
+def read_identities_csv(data_dir):
+    """Read the identities.csv file and return its contents (minus the header row) as a dict
+
+    Parameters
+    ----------
+    data_dir: data directory path
+    """
+    lines = {}
+    csv_path = data_dir + '/attribs/identities.csv'
+    if os.path.isfile(csv_path):
+        with open(csv_path, 'r') as file:
+            reader = csv.reader(file)
+            next(reader, None)  # skip header row
+            for row in reader:
+                lines[row[0]] = row[1]
+    return lines
+
 def get_command_line_parameters(parser, args):
     """
     read parameters entered on the command line.
@@ -116,6 +133,7 @@ def get_command_line_parameters(parser, args):
             raise ValueError("Please provide a valid input video file")
     else:
         input_file = int(args.camera)
+
     data = args.data
     if not data:
         data = os.environ.get(DATA_DIR_ENV_VAR)
@@ -128,6 +146,14 @@ def get_command_line_parameters(parser, args):
         print("ERROR: Please check your data directory path\n")
         parser.print_help()
         sys.exit(1)
+
+    if args.show_identity:
+        global identity_names_dict
+        # read in the csv file that maps identities to names
+        identity_names_dict = read_identities_csv(data)
+        global header_row
+        header_row.extend(['identity', 'name'])
+
     max_num_of_faces = int(args.num_faces)
     output_file = args.output
     csv_file = args.file
@@ -390,15 +416,42 @@ def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame,
     cv2.putText(frame, " :" + str(key_name), (upper_right_x + val_rect_width, upper_right_y), cv2.FONT_HERSHEY_DUPLEX,
                 TEXT_SIZE,
                 (255, 255, 255), 1, cv2.LINE_AA)
- 
- 
- 
-def write_metrics(frame):
+
+def display_identity_on_screen(frame, identity, upper_left_y, upper_left_x):
     """
-    write measurements, emotions, expressions on screen
+        Display the face identity metrics on screen.
+
+            Parameters
+            ----------
+            frame: affvisionpy.Frame
+                Frame object to write the measurement on
+            identity: int
+                identity of the occupant in the current frame
+            upper_left_y: upper left Y coordinate of the face bounding box
+            upper_left_x:  upper left X coordinate of the face bounding box
+
+        """
+
+    upper_left_x += 25
+
+    if str(identity) in identity_names_dict:
+        name = identity_names_dict[str(identity)]
+        id_name = "Identity " + str(identity) + ": " + name
+    else:
+        name = "Unknown"
+        id_name = "Identity " + str(identity) + ": " + name
+
+    cv2.putText(frame, id_name, (upper_left_x, upper_left_y - 10), cv2.FONT_HERSHEY_DUPLEX, TEXT_SIZE, (255, 255, 255),
+                1, cv2.LINE_AA)
+
+
+def write_metrics(args, frame):
+    """
+    write metrics on screen
  
         Parameters
         ----------
+        args: parsed command line arguments
         frame: affvisionpy.Frame
             frame to write the metrics on
  
@@ -412,10 +465,12 @@ def write_metrics(frame):
         box_width = lower_right_x - upper_left_x
         upper_right_x = upper_left_x + box_width
         upper_right_y = upper_left_y
- 
+
+        if args.show_identity:
+            display_identity_on_screen(frame, identities_dict[fid], upper_left_y, upper_left_x)
+
         for key, val in measurements.items():
             display_measurements_on_screen(key, val, upper_left_y, frame, upper_left_x)
- 
             upper_left_y += 25
  
         for key, val in emotions.items():
@@ -424,11 +479,9 @@ def write_metrics(frame):
  
         for key, val in expressions.items():
             display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame, upper_left_y)
- 
             upper_right_y += 25
- 
- 
- 
+
+
 def run(csv_data):
     """
     Starting point of the program, initializes the detector, processes a frame and then writes metrics to frame
@@ -441,12 +494,16 @@ def run(csv_data):
     global num_faces
     parser, args = parse_command_line()
     input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height = get_command_line_parameters(parser, args)
+
     if isinstance(input_file, int):
         start_time = time.time()
     detector = af.SyncFrameDetector(data, max_num_of_faces)
- 
-    detector.enable_features({af.Feature.expressions, af.Feature.emotions})
- 
+
+    features = {af.Feature.expressions, af.Feature.emotions}
+    if args.show_identity:
+        features.add(af.Feature.identity)
+    detector.enable_features(features)
+
     list = Listener()
     detector.set_image_listener(list)
  
@@ -506,12 +563,12 @@ def run(csv_data):
  
                 except Exception as exp:
                     print(exp)
-                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0))
+                write_metrics_to_csv_data_list(args, csv_data, round(timestamp, 0))
  
                 if len(num_faces) > 0 and not check_bounding_box_outside(width, height):
                     draw_bounding_box(frame)
                     draw_affectiva_logo(frame, width, height)
-                    write_metrics(frame)
+                    write_metrics(args, frame)
                     cv2.imshow('Processed Frame', frame)
                 else:
                     draw_affectiva_logo(frame, width, height)
@@ -553,7 +610,7 @@ def clear_all_dictionaries():
     emotions_dict.clear()
     expressions_dict.clear()
     measurements_dict.clear()
- 
+    identities_dict.clear()
  
  
 def draw_affectiva_logo(frame, width, height):
@@ -608,7 +665,7 @@ def check_bounding_box_outside(width, height):
  
  
  
-def write_metrics_to_csv_data_list(csv_data, timestamp):
+def write_metrics_to_csv_data_list(args, csv_data, timestamp):
     """
     Write metrics per frame to a list
  
@@ -643,6 +700,13 @@ def write_metrics_to_csv_data_list(csv_data, timestamp):
                 current_frame_data[str(key).split('.')[1]] = round(val,4)
             for key,val in expressions_dict[fid].items():
                 current_frame_data[str(key).split('.')[1]] = round(val,4)
+            if args.show_identity:
+                identity = identities_dict[fid]
+                current_frame_data["identity"] = identity
+                if str(identity) in identity_names_dict:
+                    current_frame_data["name"] = identity_names_dict[str(identity)]
+                else:
+                    current_frame_data["name"] = "Unknown"
             current_frame_data["confidence"] = round(bounding_box_dict[fid][4],4)
             csv_data.append(current_frame_data)
  
@@ -656,10 +720,10 @@ def parse_command_line():
     -------
     args: argparse object of the command line
     """
-    parser = argparse.ArgumentParser(description="Sample code for demoing affvisionpy module on webcam or a saved video file.\n \
-        By default, the program will run with the camera parameter displaying frames of size 1280 x 720.\n")
-    parser.add_argument("-d", "--data", dest="data", required=False, help="path to directory containing the models. \
-                        Alternatively, specify the path via the environment variable " + DATA_DIR_ENV_VAR + "=/path/to/data/vision")
+    parser = argparse.ArgumentParser(description="Sample code for demoing affvisionpy module using a webcam or a video file.\n \
+        By default, the program will run with the camera parameter, displaying frames of size 1280 x 720.\n")
+    parser.add_argument("-d", "--data", dest="data", required=False, help="path to SDK data directory \
+                        Alternatively, specify the path via the environment variable " + DATA_DIR_ENV_VAR)
     parser.add_argument("-i", "--input", dest="video", required=False,
                         help="path to input video file")
     parser.add_argument("-n", "--num_faces", dest="num_faces", required=False, default=1,
@@ -671,6 +735,7 @@ def parse_command_line():
     parser.add_argument("-f", "--file", dest="file", required=False, default=DEFAULT_FILE_NAME,
                         help="name of the output CSV file")
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1280, 720], help="resolution in pixels (2-values): width height")
+    parser.add_argument("--identity", dest="show_identity", action='store_true', help="show identity metrics")
     args = parser.parse_args()
     return parser, args
  

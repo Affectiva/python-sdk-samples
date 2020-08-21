@@ -1,3 +1,4 @@
 # Packages to install:
 
 opencv-contrib-python
+tqdm
