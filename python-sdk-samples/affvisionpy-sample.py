@@ -520,7 +520,7 @@ def run(csv_data):
         start_time = time.time()
     detector = af.SyncFrameDetector(data, max_num_of_faces)
 
-    features = {af.Feature.expressions, af.Feature.emotions}
+    features = {af.Feature.expressions, af.Feature.emotions, af.Feature.gaze, af.Feature.appearances}
     if args.show_identity:
         features.add(af.Feature.identity)
     detector.enable_features(features)
@@ -752,7 +752,7 @@ def parse_command_line():
                         Alternatively, specify the path via the environment variable " + DATA_DIR_ENV_VAR)
     parser.add_argument("-i", "--input", dest="video", required=False,
                         help="path to input video file")
-    parser.add_argument("-n", "--num_faces", dest="num_faces", required=False, default=1,
+    parser.add_argument("-n", "--num_faces", dest="num_faces", required=False, default=5,
                         help="number of faces to identify in the frame")
     parser.add_argument("-c", "--camera", dest="camera", required=False, const="0", nargs='?', default=0,
                         help="enable this parameter take input from the webcam and provide a camera id for the webcam")
