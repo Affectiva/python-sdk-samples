@@ -40,14 +40,12 @@ def run(csv_data):
             Values to hold for each frame
     """
     parser, args = parse_command_line()
-    input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height, sync = get_command_line_parameters(parser, args)
+    input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height = get_command_line_parameters(parser, args)
     if isinstance(input_file, int):
         start_time = time.time()         
-
-    if sync:
-        detector = af.SyncFrameDetector(data, max_num_of_faces)
-    else:
         detector = af.FrameDetector(data, max_num_faces=max_num_of_faces)
+    else:
+        detector = af.SyncFrameDetector(data, max_num_of_faces)
 
     detector.enable_features({af.Feature.expressions, af.Feature.emotions})
  
@@ -101,7 +99,10 @@ def run(csv_data):
             if timestamp>last_timestamp or count == 0: # if there's a problem with the timestamp, don't process the frame
              
                 last_timestamp = timestamp
+                listener.mutex.acquire()
                 listener.time_metrics_dict['timestamp'] = timestamp 
+                listener.mutex.release()
+                    
                 afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(timestamp))
                 count += 1
                   
@@ -247,7 +248,6 @@ def parse_command_line():
     parser.add_argument("-f", "--file", dest="file", required=False, default=DEFAULT_FILE_NAME,
                         help="name of the output CSV file")
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1280, 720], help="resolution in pixels (2-values): width height")
-    parser.add_argument("--sync", default=False, action="store_true", help="enable to use SyncFrameProcesor (only valid if using webcam)")
     args = parser.parse_args()
     return parser, args
  
@@ -268,11 +268,9 @@ def get_command_line_parameters(parser, args):
     """
     if not args.video is None:
         input_file = args.video
-        sync = True
         if not os.path.isfile(input_file):
             raise ValueError("Please provide a valid input video file")
     else:
-        sync = args.sync if args.sync else False
         input_file = int(args.camera)
     data = args.data
     if not data:
@@ -291,7 +289,7 @@ def get_command_line_parameters(parser, args):
     csv_file = args.file
     frame_width = int(args.res[WIDTH])
     frame_height= int(args.res[HEIGHT])
-    return input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height, sync
+    return input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height
  
 
 if __name__ == "__main__":

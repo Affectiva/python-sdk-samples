@@ -1,6 +1,6 @@
 # !/usr/bin/env python3.5
-
 from collections import defaultdict
+from threading import Lock
 import affvisionpy as af
 
 class Listener(af.ImageListener):
@@ -13,7 +13,8 @@ class Listener(af.ImageListener):
         
         self.count = 0
         self.process_last_ts = 0.0
-        self.capture_last_ts = 0.0 
+        self.capture_last_ts = 0.0
+        self.mutex = Lock()
 
         self.measurements_dict = defaultdict()
         self.expressions_dict = defaultdict()
@@ -23,6 +24,8 @@ class Listener(af.ImageListener):
         self.num_faces = defaultdict()
  
     def results_updated(self, faces, image):
+        self.mutex.acquire()
+        
         timestamp = self.time_metrics_dict['timestamp']
         capture_fps = self.time_metrics_dict['cfps']
         #avoid div by 0 error on the first frame
@@ -50,7 +53,8 @@ class Listener(af.ImageListener):
                                                 face.get_bounding_box()[1].x,
                                                 face.get_bounding_box()[1].y,
                                                 face.get_confidence()]
- 
+        self.mutex.release()
+    
     def image_captured(self, image):
         try:
             capture_fps = 1000.0 / (image.timestamp() - self.capture_last_ts)
