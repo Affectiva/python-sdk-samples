@@ -24,9 +24,9 @@ class Listener(af.ImageListener):
         self.num_faces = defaultdict()
  
     def results_updated(self, faces, image):
+        timestamp = image.timestamp()
+
         self.mutex.acquire()
-        
-        timestamp = self.time_metrics_dict['timestamp']
         capture_fps = self.time_metrics_dict['cfps']
         #avoid div by 0 error on the first frame
         try:

@@ -99,10 +99,6 @@ def run(csv_data):
             if timestamp>last_timestamp or count == 0: # if there's a problem with the timestamp, don't process the frame
              
                 last_timestamp = timestamp
-                listener.mutex.acquire()
-                listener.time_metrics_dict['timestamp'] = timestamp 
-                listener.mutex.release()
-                    
                 afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(timestamp))
                 count += 1
                   
@@ -112,11 +108,14 @@ def run(csv_data):
                 except Exception as exp:
                     print(exp)
 
+                listener.mutex.acquire()
                 num_faces = listener.num_faces
                 measurements_dict = listener.measurements_dict.copy()
                 expressions_dict = listener.expressions_dict.copy()
                 emotions_dict = listener.emotions_dict.copy()
                 bounding_box_dict = listener.bounding_box_dict.copy()
+                listener.mutex.release()
+
                 listener_metrics = {
                     "measurements": measurements_dict,
                     "expressions": expressions_dict,
