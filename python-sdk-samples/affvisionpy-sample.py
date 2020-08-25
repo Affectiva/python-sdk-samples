@@ -51,16 +51,13 @@ def run(csv_data):
     detector.start()
  
     captureFile = cv2.VideoCapture(input_file)
-    window = cv2.namedWindow('Processed Frame', cv2.WINDOW_NORMAL)
  
     if not args.video:
-        cv2.resizeWindow('Processed Frame', frame_width, frame_height)
         captureFile.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
         captureFile.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
         #If cv2 silently fails, default to 1280 x 720 instead of 640 x 480
         if captureFile.get(3) != frame_width or captureFile.get(4) != frame_height:
-            print(frame_width, "x", frame_height, "is an unsupported resolution, defaulting to 1280 x 720")
-            cv2.resizeWindow('Processed Frame',DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT)
+            print(frame_width, "x", frame_height, "is an unsupported resolution, defaulting to 1920 x 1080")
             captureFile.set(cv2.CAP_PROP_FRAME_HEIGHT, DEFAULT_FRAME_HEIGHT)
             captureFile.set(cv2.CAP_PROP_FRAME_WIDTH, DEFAULT_FRAME_WIDTH)
             frame_width = DEFAULT_FRAME_WIDTH
@@ -72,7 +69,6 @@ def run(csv_data):
     else:
         file_width = int(captureFile.get(3))
         file_height = int(captureFile.get(4))
-        cv2.resizeWindow('Processed Frame', file_width, file_height)
  
     if output_file is not None:
        out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, (file_width, file_height))

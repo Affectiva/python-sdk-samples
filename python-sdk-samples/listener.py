@@ -21,6 +21,7 @@ class Listener(af.ImageListener):
         self.emotions_dict = defaultdict()
         self.bounding_box_dict = defaultdict()
         self.time_metrics_dict = defaultdict()
+        self.faces = defaultdict()
  
     def results_updated(self, faces, image):
         timestamp = image.timestamp()
