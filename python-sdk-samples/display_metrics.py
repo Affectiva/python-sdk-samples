@@ -1,4 +1,4 @@
-# !/usr/bin/env python3.5
+# !/usr/bin/env python3
 import cv2
 import os
 import math
@@ -25,7 +25,6 @@ def draw_metrics(frame, listener_metrics):
         expressions = listener_metrics["expressions"][fid]
         emotions = listener_metrics["emotions"][fid]
         upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
-        box_height = lower_right_y - upper_left_y
         box_width = lower_right_x - upper_left_x
         upper_right_x = upper_left_x + box_width
         upper_right_y = upper_left_y
@@ -36,11 +35,11 @@ def draw_metrics(frame, listener_metrics):
             upper_left_y += 25
  
         for key, val in emotions.items():
-            display_emotions_on_screen(key, val, upper_left_y, frame, upper_left_x)
+            display_emotions_on_screen(key, val, upper_left_x, upper_left_y, frame)
             upper_left_y += 25
  
         for key, val in expressions.items():
-            display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame, upper_left_y)
+            display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame)
  
             upper_right_y += 25
 
@@ -87,6 +86,7 @@ def draw_bounding_box(frame, listener_metrics):
                 anger_value = listener_metrics["emotions"][fid][key]
             if 'joy' in str(key):
                 joy_value = listener_metrics["emotions"][fid][key]
+
         if valence_value < 0 and anger_value >= THRESHOLD_VALUE_FOR_EMOTIONS:
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 0, 255), 3)
         elif valence_value >= THRESHOLD_VALUE_FOR_EMOTIONS and joy_value >= THRESHOLD_VALUE_FOR_EMOTIONS:
@@ -123,9 +123,9 @@ def display_measurements_on_screen(key, val, upper_left_y, frame, x1):
  
        Parameters
        ----------
-       key: str
+       key: affvisionpy.Measurement
            Name of the measurement.
-       val: str
+       val: float
            Value of the measurement.
        upper_left_y: int
            the upper_left_y co-ordinate of the bounding box
@@ -134,10 +134,11 @@ def display_measurements_on_screen(key, val, upper_left_y, frame, x1):
        x1: upper_left_x co-ordinate of the bounding box whose measurements need to be written
  
     """
-    key = str(key)
-    padding = 20
-    key_name = key.split(".")[1]
+    key_name = key.name
     key_text_width, key_text_height = get_text_size(key_name, cv2.FONT_HERSHEY_SIMPLEX, 1)
+
+    if math.isnan(val):
+        val = 0
     val_text = str(round(val, 2))
     val_text_width, val_text_height = get_text_size(val_text, cv2.FONT_HERSHEY_SIMPLEX, 1)
  
@@ -152,34 +153,34 @@ def display_measurements_on_screen(key, val, upper_left_y, frame, x1):
                 (255, 255, 255))
  
  
-def display_emotions_on_screen(key, val, upper_left_y, frame, x1):
+def display_emotions_on_screen(key, val, upper_left_x, upper_left_y, frame):
     """
     Display the emotion metrics on screen.
  
         Parameters
         ----------
-        key: str
+        key: affvisionpy.Emotion
             Name of the emotion.
-        val: str
+        val: float
             Value of the emotion.
+        upper_left_x: int
+            the upper_left_x co-ordinate of the bounding box
         upper_left_y: int
             the upper_left_y co-ordinate of the bounding box
         frame: affvisionpy.Frame
-            Frame object to write the measurement on
-        x1: upper_left_x co-ordinate of the bounding box whose measurements need to be written
+            Frame object to write the emotion on
  
     """
-    key = str(key)
-    key_name = key.split(".")[1]
+    key_name = key.name
     key_text_width, key_text_height = get_text_size(key_name, cv2.FONT_HERSHEY_SIMPLEX, 1)
  
     val_rect_width = 120
     key_val_width = key_text_width + val_rect_width
-    cv2.putText(frame, key_name + ": ", (abs(x1 - key_val_width), upper_left_y),
+    cv2.putText(frame, key_name + ": ", (abs(upper_left_x - key_val_width), upper_left_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 TEXT_SIZE,
                 (0, 0,0), 4, cv2.LINE_AA)
-    cv2.putText(frame, key_name + ": ", (abs(x1 - key_val_width), upper_left_y),
+    cv2.putText(frame, key_name + ": ", (abs(upper_left_x - key_val_width), upper_left_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 TEXT_SIZE,
                 (255, 255, 255), 2, cv2.LINE_AA)
@@ -188,7 +189,7 @@ def display_emotions_on_screen(key, val, upper_left_y, frame, x1):
     if math.isnan(val):
         val = 0
  
-    start_box_point_x = abs(x1 - val_rect_width)
+    start_box_point_x = abs(upper_left_x - val_rect_width)
     width = 8
     height = 10
  
@@ -200,7 +201,7 @@ def display_emotions_on_screen(key, val, upper_left_y, frame, x1):
         start_box_point_x += 10
         cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
                       (start_box_point_x + width, upper_left_y - height), (186, 186, 186), -1)
-        if ('valence' in key and val < 0) or ('anger' in key and val > 0):
+        if ('valence' in key_name and val < 0) or ('anger' in key_name and val > 0):
             cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
                           (start_box_point_x + width, upper_left_y - height), (0, 0, 255), -1)
         else:
@@ -215,34 +216,31 @@ def display_emotions_on_screen(key, val, upper_left_y, frame, x1):
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
  
  
-def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame, upper_left_y):
+def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame):
     """
     Display the expressions metrics on screen.
  
         Parameters
         ----------
-        key: str
-            Name of the emotion.
-        val: str
-            Value of the emotion.
+        key: affvisionpy.Expression
+            Name of the expression.
+        val: float
+            Value of the expression.
         upper_right_x: int
-            the upper_left_x co-ordinate of the bounding box
+            the upper_right_x co-ordinate of the bounding box
         upper_right_y: int
-            the upper_left_y co-ordinate of the bounding box
+            the upper_right_y co-ordinate of the bounding box
         frame: affvisionpy.Frame
-            Frame object to write the measurement on
-        upper_left_y: upper_left_y co-ordinate of the bounding box whose measurements need to be written
+            Frame object to write the expression on
  
     """
-    key = str(key)
- 
-    key_name = key.split(".")[1]
+    key_name = key.name
     val_rect_width = 120
     overlay = frame.copy()
     if math.isnan(val):
         val = 0
  
-    if 'blink' not in key:
+    if 'blink' not in key_name:
         start_box_point_x = upper_right_x
         width = 8
         height = 10
@@ -263,7 +261,6 @@ def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame,
  
         alpha = 0.8
         cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-        upper_left_y += 25
     else:
         cv2.putText(frame, str(val), (upper_right_x, upper_right_y), cv2.FONT_HERSHEY_DUPLEX, TEXT_SIZE,
                     (0, 0, 0), 2, cv2.LINE_AA)

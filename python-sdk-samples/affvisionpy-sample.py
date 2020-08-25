@@ -1,4 +1,4 @@
-# !/usr/bin/env python3.5
+# !/usr/bin/env python3
 import argparse
 import sys
 import os
@@ -14,8 +14,8 @@ from display_metrics import (draw_metrics, check_bounding_box_outside, draw_boun
 
 # Constants
 NOT_A_NUMBER = 'nan'
-DEFAULT_FRAME_WIDTH = 1280
-DEFAULT_FRAME_HEIGHT = 720
+DEFAULT_FRAME_WIDTH = 1920
+DEFAULT_FRAME_HEIGHT = 1080
 DEFAULT_FILE_NAME = "default"
 DATA_DIR_ENV_VAR = "AFFECTIVA_VISION_DATA_DIR"
  
@@ -24,10 +24,6 @@ header_row = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 
         'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure', 'cheek_raise', 'yawn',
         'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor'
         ]
- 
-#Argparse Variable Constants
-WIDTH = 0
-HEIGHT = 1
 
 
 def run(csv_data):
@@ -81,7 +77,7 @@ def run(csv_data):
     if output_file is not None:
        out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, (file_width, file_height))
     count = 0
-    timestamp = 0
+    curr_timestamp = 0
     last_timestamp = 0
 
     while captureFile.isOpened():
@@ -93,13 +89,13 @@ def run(csv_data):
             height = frame.shape[0]
             width = frame.shape[1]
             if isinstance(input_file, int):
-                timestamp = (time.time() - start_time) * 1000.0
+                curr_timestamp = (time.time() - start_time) * 1000.0
             else:
-                timestamp = int(captureFile.get(cv2.CAP_PROP_POS_MSEC))
-            if timestamp>last_timestamp or count == 0: # if there's a problem with the timestamp, don't process the frame
+                curr_timestamp = int(captureFile.get(cv2.CAP_PROP_POS_MSEC))
+            if curr_timestamp > last_timestamp or count == 0: # if there's a problem with the timestamp, don't process the frame
              
-                last_timestamp = timestamp
-                afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(timestamp))
+                last_timestamp = curr_timestamp
+                afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(curr_timestamp))
                 count += 1
                   
                 try:
@@ -109,7 +105,7 @@ def run(csv_data):
                     print(exp)
 
                 listener.mutex.acquire()
-                num_faces = listener.num_faces
+                faces = listener.faces
                 measurements_dict = listener.measurements_dict.copy()
                 expressions_dict = listener.expressions_dict.copy()
                 emotions_dict = listener.emotions_dict.copy()
@@ -123,9 +119,9 @@ def run(csv_data):
                     "bounding_box": bounding_box_dict
                 }
 
-                write_metrics_to_csv_data_list(csv_data, round(timestamp, 0), listener_metrics)
+                write_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
 
-                if len(num_faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
+                if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
                     draw_bounding_box(frame, listener_metrics)
                     draw_affectiva_logo(frame, width, height)
                     draw_metrics(frame, listener_metrics)
@@ -139,7 +135,7 @@ def run(csv_data):
                 if cv2.waitKey(1) == 27:
                     break
             else:
-                print("skipped a frame due to the timestamp not incrementing - old timestamp %f, new timestamp %f" % (last_timestamp,timestamp))
+                print("skipped a frame due to the timestamp not incrementing - old timestamp %f, current timestamp %f" % (last_timestamp,curr_timestamp))
         else:
             break
  
@@ -215,7 +211,6 @@ def write_csv_data_to_file(csv_data, csv_file):
     if ".csv" not in csv_file:
         csv_file = csv_file + ".csv"
     with open(csv_file, 'w') as c_file:
-        keys = csv_data[0].keys()
         writer = csv.DictWriter(c_file, fieldnames=header_row)
         writer.writeheader()
         for row in csv_data:
@@ -270,7 +265,10 @@ def get_command_line_parameters(parser, args):
         if not os.path.isfile(input_file):
             raise ValueError("Please provide a valid input video file")
     else:
-        input_file = int(args.camera)
+        if args.camera.isdigit():
+            input_file = int(args.camera)
+        else:
+            raise ValueError("Please provide an integer value for camera")
     data = args.data
     if not data:
         data = os.environ.get(DATA_DIR_ENV_VAR)
@@ -286,8 +284,8 @@ def get_command_line_parameters(parser, args):
     max_num_of_faces = int(args.num_faces)
     output_file = args.output
     csv_file = args.file
-    frame_width = int(args.res[WIDTH])
-    frame_height= int(args.res[HEIGHT])
+    frame_width = int(args.res[0])
+    frame_height= int(args.res[1])
     return input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height
  
 

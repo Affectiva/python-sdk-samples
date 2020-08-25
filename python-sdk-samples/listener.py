@@ -1,4 +1,4 @@
-# !/usr/bin/env python3.5
+# !/usr/bin/env python3
 from collections import defaultdict
 from threading import Lock
 import affvisionpy as af
@@ -21,7 +21,6 @@ class Listener(af.ImageListener):
         self.emotions_dict = defaultdict()
         self.bounding_box_dict = defaultdict()
         self.time_metrics_dict = defaultdict()
-        self.num_faces = defaultdict()
  
     def results_updated(self, faces, image):
         timestamp = image.timestamp()
@@ -37,18 +36,17 @@ class Listener(af.ImageListener):
         self.count +=1
         self.process_last_ts = image.timestamp()
         self.faces = faces
-        self.num_faces = faces
 
         self.clear_all_dictionaries()
         for fid, face in faces.items():
-            self.measurements_dict[face.get_id()] = defaultdict()
-            self.expressions_dict[face.get_id()] = defaultdict()
-            self.emotions_dict[face.get_id()] = defaultdict()
+            self.measurements_dict[fid] = defaultdict()
+            self.expressions_dict[fid] = defaultdict()
+            self.emotions_dict[fid] = defaultdict()
 
-            self.measurements_dict[face.get_id()].update(face.get_measurements())
-            self.expressions_dict[face.get_id()].update(face.get_expressions())
-            self.emotions_dict[face.get_id()].update(face.get_emotions())
-            self.bounding_box_dict[face.get_id()] = [face.get_bounding_box()[0].x,
+            self.measurements_dict[fid].update(face.get_measurements())
+            self.expressions_dict[fid].update(face.get_expressions())
+            self.emotions_dict[fid].update(face.get_emotions())
+            self.bounding_box_dict[fid] = [face.get_bounding_box()[0].x,
                                                 face.get_bounding_box()[0].y,
                                                 face.get_bounding_box()[1].x,
                                                 face.get_bounding_box()[1].y,
