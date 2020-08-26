@@ -468,9 +468,6 @@ def get_command_line_parameters(parser, args):
             global identity_names_dict
             # read in the csv file that maps identities to names
             identity_names_dict = read_identities_csv(data)
-            # identity_names_dict['1'] = 'alpesh'
-            # identity_names_dict['0'] = 'kjhhj'
-            # identity_names_dict['2'] = 'dfassadd'
             header_row.extend(['identity', 'name'])
     elif args.show_object:
         header_row = HEADER_ROW_OBJECTS
