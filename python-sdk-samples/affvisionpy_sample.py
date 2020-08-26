@@ -10,7 +10,7 @@ import affvisionpy as af
 import cv2
 
 from listener import Listener as ImageListener
-from object_listener import Listener as ObjectListener
+from object_listener import ObjectListener as ObjectListener
 
 from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo,
                              get_bounding_box_points, draw_objects)
@@ -288,11 +288,11 @@ def write_face_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
             current_frame_data["lowerRightX"] = lowerRightX
             current_frame_data["lowerRightY"] = lowerRightY
             for key, val in listener_metrics["measurements"][fid].items():
-                current_frame_data[str(key).split('.')[1]] = round(val, 4)
+                current_frame_data[key.name] = round(val, 4)
             for key, val in listener_metrics["emotions"][fid].items():
-                current_frame_data[str(key).split('.')[1]] = round(val, 4)
+                current_frame_data[key.name] = round(val, 4)
             for key, val in listener_metrics["expressions"][fid].items():
-                current_frame_data[str(key).split('.')[1]] = round(val, 4)
+                current_frame_data[key.name] = round(val, 4)
             current_frame_data["confidence"] = round(listener_metrics["bounding_box"][fid][4], 4)
 
             if "identities" in listener_metrics:
@@ -303,7 +303,7 @@ def write_face_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
                 else:
                     current_frame_data["name"] = "Unknown"
 
-            current_frame_data["gaze_region"] = str(listener_metrics["gaze_metric"][fid].gaze_region.name)
+            current_frame_data["gaze_region"] = listener_metrics["gaze_metric"][fid].gaze_region.name
             current_frame_data["gaze_confidence"] = str(listener_metrics["gaze_metric"][fid].confidence)
             current_frame_data["glasses"] = round(listener_metrics["glasses"][fid])
             csv_data.append(current_frame_data)
@@ -336,7 +336,7 @@ def write_object_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics)
             current_frame_data["lowerRightY"] = lowerRightY
 
             current_frame_data["confidence"] = round(listener_metrics["confidence"][oid])
-            current_frame_data["ObjectType"] = str(listener_metrics["object_type"][oid])
+            current_frame_data["ObjectType"] = listener_metrics["object_type"][oid].name
             csv_data.append(current_frame_data)
     else:
         current_frame_data["TimeStamp"] = timestamp
@@ -377,7 +377,7 @@ def parse_command_line():
     parser = argparse.ArgumentParser(description="Sample code for demoing affvisionpy module on webcam or a saved video file.\n \
         By default, the program will run with the camera parameter displaying frames of size 1280 x 720.\n")
     parser.add_argument("-d", "--data", dest="data", required=False, help="path to directory containing the models. \
-                        Alternatively, specify the path via the environment variable " + DATA_DIR_ENV_VAR + "=/path/to/data/vision")
+                        Alternatively, specify the path via the environment variable " + DATA_DIR_ENV_VAR + "=/path/to/data/")
     parser.add_argument("-i", "--input", dest="video", required=False,
                         help="path to input video file")
     parser.add_argument("-n", "--num_faces", dest="num_faces", required=False, default=5,

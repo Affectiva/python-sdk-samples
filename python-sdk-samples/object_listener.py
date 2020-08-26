@@ -3,14 +3,14 @@ from collections import defaultdict
 from threading import Lock
 import affvisionpy as af
 
-class Listener(af.ObjectListener):
+class ObjectListener(af.ObjectListener):
     """
     ObjectListener class that return object metrics for processed frames.
 
     """
 
     def __init__(self, object_interval):
-        super(Listener, self).__init__()
+        super(ObjectListener, self).__init__()
 
         self.count = 0
         self.process_last_ts = 0.0
