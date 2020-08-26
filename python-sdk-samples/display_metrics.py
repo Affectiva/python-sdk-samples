@@ -10,6 +10,8 @@ THRESHOLD_VALUE_FOR_EMOTIONS = 5
 
 identity_names_dict = defaultdict()
 
+IMAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
+
 def draw_metrics(args, frame, listener_metrics):
     """
     write metrics on screen
@@ -63,6 +65,12 @@ def draw_metrics(args, frame, listener_metrics):
         for key, val in expressions.items():
             display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame)
             upper_right_y += 25
+
+    # draw gaze region for the first face. (ideally we should draw it for the driver only)
+    gaze_metrics = listener_metrics["gaze_metric"]
+    if len(gaze_metrics):
+        metric = next(iter(gaze_metrics.values()))
+        draw_gaze_region(frame, metric)
 
 
 def get_bounding_box_points(fid, bounding_box_dict):
@@ -336,7 +344,7 @@ def draw_affectiva_logo(frame, width, height):
         height: int
            height of the frame
     """
-    logo = cv2.imread(os.path.dirname(os.path.abspath(__file__))+"/Final logo - RGB Magenta.png")
+    logo = cv2.imread(os.path.join(IMAGES_DIR, 'Final logo - RGB Magenta.png'))
     logo_width = int(width / 3)
     logo_height = int(height / 10)
     logo = cv2.resize(logo, (logo_width, logo_height))
@@ -350,6 +358,34 @@ def draw_affectiva_logo(frame, width, height):
         beta = frame[y1:y2, x1:x2, c] * (alpha)
         frame[y1:y2, x1:x2, c] = color + beta
  
+
+def draw_gaze_region(frame, gaze_metric):
+    idx = int(gaze_metric.gaze_region)
+
+    # width = frame.shape[1]
+    height = frame.shape[0]
+
+    ypadding = 10
+    xpadding = 10
+    if idx == -1:
+        idx = 0
+
+    img_name = "gaze_region_{0}.png".format(idx)
+    img = cv2.imread(os.path.join(IMAGES_DIR, img_name), cv2.IMREAD_UNCHANGED)
+
+    img_height = int(height / 4)
+    img_width = int(img.shape[1] * float(img_height) / img.shape[0])
+    img = cv2.resize(img, (img_width, img_height))
+
+    y1, y2 = height - img_height - ypadding, height - ypadding
+    x1, x2 = xpadding, img_width + xpadding
+
+    alpha = img[:, :, 3] / 255.0
+    alpha_frame = 1.0 - alpha
+
+    for c in range(0, 3):
+        frame[y1:y2, x1:x2, c] = (alpha * img[:, :, c] + alpha_frame * frame[y1:y2, x1:x2, c])
+
 
 def check_bounding_box_outside(width, height, bounding_box_dict):
     """
