@@ -80,6 +80,7 @@ def run(csv_data):
         file_width = int(capture_file.get(3))
         file_height = int(capture_file.get(4))
 
+    out = None
     if output_file is not None:
         out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, (file_width, file_height))
 
