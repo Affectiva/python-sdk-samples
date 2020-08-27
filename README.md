@@ -60,3 +60,7 @@ For both video and webcam options, the script displays real-time metrics on the 
 
 For the video option, the synchronous version of affvisionpy's FrameDetector will be used (SyncFrameDetector). 
 For the webcam option, the asynchronous version will be used (FrameDetector).
+
+#### Eye gaze:
+
+We currently don't have a way to identify the driver, hence we are assuming the driver is the first face from the returned faces dictionary and visualizing its gaze region
