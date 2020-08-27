@@ -19,7 +19,7 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         ----------
         args: parsed command line arguments
 
-        frame: affvisionpy.Frame
+        frame: numpy array
             frame to write the metrics on
 
         listener_metrics: dict
@@ -36,7 +36,6 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         upper_right_y = upper_left_y
 
         if "identities" in listener_metrics:
-            print(listener_metrics["identities"][fid])
             display_identity_on_screen(frame, listener_metrics["identities"][fid], upper_left_y, upper_left_x, identity_names_dict)
  
         for key, val in measurements.items():
@@ -78,7 +77,7 @@ def draw_objects(frame, listener_metrics):
 
         Parameters
         ----------
-        frame: affvisionpy.Frame
+        frame: numpy array
             frame to write the metrics on
 
         listener_metrics: dict
@@ -127,7 +126,7 @@ def draw_bounding_box(frame, listener_metrics):
  
         Parameters
         ----------
-        frame: affvisionPy.Frame
+        frame: numpy array
             Frame object to draw the bounding box on.
 
         listener_metrics: dict
@@ -184,7 +183,7 @@ def display_measurements_on_screen(key, val, upper_left_y, frame, x1):
            Value of the measurement.
        upper_left_y: int
            the upper_left_y co-ordinate of the bounding box
-       frame: affvisionpy.Frame
+       frame: numpy array
            Frame object to write the measurement on
        x1: upper_left_x co-ordinate of the bounding box whose measurements need to be written
  
@@ -221,7 +220,7 @@ def display_left_metrics(key_name, val, upper_left_x, upper_left_y, frame):
             the upper_left_x co-ordinate of the bounding box
         upper_left_y: int
             the upper_left_y co-ordinate of the bounding box
-        frame: affvisionpy.Frame
+        frame: numpy array
             Frame object to write the emotion on
  
     """
@@ -237,7 +236,6 @@ def display_left_metrics(key_name, val, upper_left_x, upper_left_y, frame):
                 cv2.FONT_HERSHEY_SIMPLEX,
                 TEXT_SIZE,
                 (255, 255, 255), 2, cv2.LINE_AA)
-    overlay = frame.copy()
 
     if math.isnan(val):
         val = 0
@@ -252,21 +250,19 @@ def display_left_metrics(key_name, val, upper_left_x, upper_left_y, frame):
 
     for i in range(0, rounded_val):
         start_box_point_x += 10
-        cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
+        cv2.rectangle(frame, (start_box_point_x, upper_left_y),
                       (start_box_point_x + width, upper_left_y - height), (186, 186, 186), -1)
         if ('valence' in key_name and val < 0) or ('anger' in key_name and val > 0):
-            cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
+            cv2.rectangle(frame, (start_box_point_x, upper_left_y),
                           (start_box_point_x + width, upper_left_y - height), (0, 0, 255), -1)
         else:
-            cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
+            cv2.rectangle(frame, (start_box_point_x, upper_left_y),
                           (start_box_point_x + width, upper_left_y - height), (0, 204, 102), -1)
     for i in range(rounded_val, 10):
         start_box_point_x += 10
-        cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
+        cv2.rectangle(frame, (start_box_point_x, upper_left_y),
                       (start_box_point_x + width, upper_left_y - height), (186, 186, 186), -1)
 
-    alpha = 0.8
-    cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
 def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame):
     """
@@ -282,13 +278,12 @@ def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame)
             the upper_right_x co-ordinate of the bounding box
         upper_right_y: int
             the upper_right_y co-ordinate of the bounding box
-        frame: affvisionpy.Frame
+        frame: numpy array
             Frame object to write the expression on
  
     """
     key_name = key.name
     val_rect_width = 120
-    overlay = frame.copy()
     if math.isnan(val):
         val = 0
 
@@ -302,17 +297,15 @@ def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame)
         rounded_val = int(rounded_val)
         for i in range(0, rounded_val):
             start_box_point_x += 10
-            cv2.rectangle(overlay, (start_box_point_x, upper_right_y),
+            cv2.rectangle(frame, (start_box_point_x, upper_right_y),
                           (start_box_point_x + width, upper_right_y - height), (186, 186, 186), -1)
-            cv2.rectangle(overlay, (start_box_point_x, upper_right_y),
+            cv2.rectangle(frame, (start_box_point_x, upper_right_y),
                           (start_box_point_x + width, upper_right_y - height), (0, 204, 102), -1)
         for i in range(rounded_val, 10):
             start_box_point_x += 10
-            cv2.rectangle(overlay, (start_box_point_x, upper_right_y),
+            cv2.rectangle(frame, (start_box_point_x, upper_right_y),
                           (start_box_point_x + width, upper_right_y - height), (186, 186, 186), -1)
 
-        alpha = 0.8
-        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
     else:
         cv2.putText(frame, str(val), (upper_right_x, upper_right_y), cv2.FONT_HERSHEY_DUPLEX, TEXT_SIZE,
                     (0, 0, 0), 2, cv2.LINE_AA)
@@ -340,7 +333,7 @@ def display_confidence_on_screen(key, val, upper_left_x, upper_left_y, frame):
             the upper_left_x co-ordinate of the bounding box
         upper_left_y: int
             the upper_left_y co-ordinate of the bounding box
-        frame: affvisionpy.Frame
+        frame: numpy array
             Frame object to write the confidence on
 
     """
@@ -356,7 +349,6 @@ def display_confidence_on_screen(key, val, upper_left_x, upper_left_y, frame):
                 cv2.FONT_HERSHEY_SIMPLEX,
                 TEXT_SIZE,
                 (255, 255, 255), 2, cv2.LINE_AA)
-    overlay = frame.copy()
 
     if math.isnan(val):
         val = 0
@@ -371,19 +363,17 @@ def display_confidence_on_screen(key, val, upper_left_x, upper_left_y, frame):
 
     for i in range(0, rounded_val):
         start_box_point_x += 10
-        cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
+        cv2.rectangle(frame, (start_box_point_x, upper_left_y),
                       (start_box_point_x + width, upper_left_y - height), (186, 186, 186), -1)
 
-        cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
+        cv2.rectangle(frame, (start_box_point_x, upper_left_y),
                       (start_box_point_x + width, upper_left_y - height), (0, 204, 102), -1)
 
     for i in range(rounded_val, 10):
         start_box_point_x += 10
-        cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
+        cv2.rectangle(frame, (start_box_point_x, upper_left_y),
                       (start_box_point_x + width, upper_left_y - height), (186, 186, 186), -1)
 
-    alpha = 0.8
-    cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
 def display_identity_on_screen(frame, identity, upper_left_y, upper_left_x, identity_names_dict):
     """
@@ -391,7 +381,7 @@ def display_identity_on_screen(frame, identity, upper_left_y, upper_left_x, iden
 
             Parameters
             ----------
-            frame: affvisionpy.Frame
+            frame: numpy array
                 Frame object to write the measurement on
             identity: int
                 identity of the occupant in the current frame
@@ -412,26 +402,42 @@ def display_identity_on_screen(frame, identity, upper_left_y, upper_left_x, iden
     cv2.putText(frame, id_name, (upper_left_x, upper_left_y - 10), cv2.FONT_HERSHEY_DUPLEX, TEXT_SIZE, (255, 255, 255),
                 1, cv2.LINE_AA)
 
-def draw_affectiva_logo(frame, width, height):
+
+def get_affectiva_logo(frame_width, frame_height):
+    """
+    Return the properly sized logo for the given sized frame
+
+    Parameters
+    ----------
+    frame_width: int
+        width of the frame the logo will be placed in
+    frame_height: int
+        height of the frame the logo will be placed in
+    """
+    logo = cv2.imread(IMAGES_DIR+"/Final logo - RGB Magenta.png")
+    logo_width = int(frame_width / 3)
+    logo_height = int(frame_height / 10)
+    logo = cv2.resize(logo, (logo_width, logo_height))
+    return logo
+
+
+def draw_affectiva_logo(frame, logo, width, height):
     """
     Place logo on the screen
  
         Parameters
         ----------
-        frame: affvisionpy.Frame
+        frame: numpy array
            Frame to place the logo on
+        logo: numpy array
+            Logo to place in the frame
         width: int
            width of the frame
         height: int
            height of the frame
     """
-
-    logo = cv2.imread(os.path.join(IMAGES_DIR, 'Final logo - RGB Magenta.png'))
-
-    logo_width = int(width / 3)
-    logo_height = int(height / 10)
-    logo = cv2.resize(logo, (logo_width, logo_height))
-
+    logo_height, logo_width = logo.shape[:2]
+    
     y1, y2 = 0, logo_height
     x1, x2 = width - logo_width, width
     # Remove the white background from the logo so that only the word "Affectiva" is visible on screen
