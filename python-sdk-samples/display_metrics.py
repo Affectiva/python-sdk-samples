@@ -6,7 +6,7 @@ from collections import defaultdict
 
 TEXT_SIZE = 0.6
 PADDING_FOR_SEPARATOR = 5
-THRESHOLD_VALUE_FOR_EMOTIONS = 5
+LEFT_METRIC_OFFSET = 105
 
 identity_names_dict = defaultdict()
 
@@ -18,52 +18,48 @@ def draw_metrics(args, frame, listener_metrics):
         ----------
         args: parsed command line arguments
 
-        frame: affvisionpy.Frame
+        frame: numpy array 
             frame to write the metrics on
 
         listener_metrics: dict
             dictionary of dictionaries, gives current listener state
  
     """
+    line_height = 25
     for fid in listener_metrics["measurements"].keys():
         measurements = listener_metrics["measurements"][fid]
         expressions = listener_metrics["expressions"][fid]
         emotions = listener_metrics["emotions"][fid]
+        gaze_metric = listener_metrics["gaze_metric"][fid]
+        glasses = listener_metrics["glasses"][fid]
         upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
         box_width = lower_right_x - upper_left_x
         upper_right_x = upper_left_x + box_width
         upper_right_y = upper_left_y
 
         if args.show_identity:
-            display_identity_on_screen(frame, listener_metrics["identities"][fid], upper_left_y, upper_left_x)
+            display_identity(frame, listener_metrics["identities"][fid], upper_left_y, upper_left_x)
  
         for key, val in measurements.items():
-            display_measurements_on_screen(key, val, upper_left_y, frame, upper_left_x)
-            upper_left_y += 25
+            display_measurements(key.name, val, upper_left_x, upper_left_y, frame)
+            upper_left_y += line_height
  
         for key, val in emotions.items():
-            display_left_metrics(key.name, val, upper_left_x, upper_left_y, frame)
-            upper_left_y += 25
+            display_left_metric(key.name, val, upper_left_x, upper_left_y, frame)
+            upper_left_y += line_height
 
-        gaze_reg = "gaze_region: " + str(listener_metrics["gaze_metric"][fid].gaze_region.name)
-        key_text_width, key_text_height = get_text_size(gaze_reg, cv2.FONT_HERSHEY_SIMPLEX, 1)
+        display_gaze(frame, gaze_metric.gaze_region.name, upper_left_x, upper_left_y)
+        upper_left_y += line_height
 
-        cv2.putText(frame, gaze_reg, (abs(upper_left_x - key_text_width - PADDING_FOR_SEPARATOR), upper_left_y),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    TEXT_SIZE,
-                    (255, 255, 255), 2, cv2.LINE_AA)
-        upper_left_y += 25
+        display_left_metric("gaze_confidence", gaze_metric.confidence, upper_left_x, upper_left_y, frame)
+        upper_left_y += line_height
 
-        display_left_metrics("gaze_confidence", listener_metrics["gaze_metric"][fid].confidence, upper_left_x, upper_left_y, frame)
-        upper_left_y += 25
-
-        display_left_metrics("glasses", listener_metrics["glasses"][fid], upper_left_x, upper_left_y, frame)
-        upper_left_y += 25
+        display_left_metric("glasses", glasses, upper_left_x, upper_left_y, frame)
+        upper_left_y += line_height
  
         for key, val in expressions.items():
-            display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame)
-            upper_right_y += 25
-
+            display_expressions(key.name, val, upper_right_x, upper_right_y, frame)
+            upper_right_y += line_height
 
 def get_bounding_box_points(fid, bounding_box_dict):
     """
@@ -73,6 +69,10 @@ def get_bounding_box_points(fid, bounding_box_dict):
         ----------
         fid: int
             face id of the face to get the bounding box for
+
+        bounding_box_dict: int -> list of float
+            dictionary from face id to array of bbox points
+ 
  
         Returns
         -------
@@ -91,13 +91,14 @@ def draw_bounding_box(frame, listener_metrics):
  
         Parameters
         ----------
-        frame: affvisionPy.Frame
-            Frame object to draw the bounding box on.
+        frame: numpy array
+            Frame to draw the bounding box on.
 
         listener_metrics: dict
             dictionary of dictionaries, gives current listener state
  
     """
+    emotion_value_threshold = 5
     for fid in listener_metrics["bounding_box"].keys():
         upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
         for key in listener_metrics["emotions"][fid]:
@@ -108,9 +109,9 @@ def draw_bounding_box(frame, listener_metrics):
             if 'joy' in str(key):
                 joy_value = listener_metrics["emotions"][fid][key]
 
-        if valence_value < 0 and anger_value >= THRESHOLD_VALUE_FOR_EMOTIONS:
+        if valence_value < 0 and anger_value >= emotion_value_threshold:
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 0, 255), 3)
-        elif valence_value >= THRESHOLD_VALUE_FOR_EMOTIONS and joy_value >= THRESHOLD_VALUE_FOR_EMOTIONS:
+        elif valence_value >= emotion_value_threshold and joy_value >= emotion_value_threshold:
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 255, 0), 3)
         else:
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (21, 169, 167), 3)
@@ -138,111 +139,163 @@ def get_text_size(text, font, thickness):
     return text_size[0][0], text_size[0][1]
  
  
-def display_measurements_on_screen(key, val, upper_left_y, frame, x1):
+def display_measurements(key_name, val, upper_left_x, upper_left_y, frame):
     """
     Display the measurement metrics on screen.
  
-       Parameters
-       ----------
-       key: affvisionpy.Measurement
-           Name of the measurement.
-       val: float
-           Value of the measurement.
-       upper_left_y: int
-           the upper_left_y co-ordinate of the bounding box
-       frame: affvisionpy.Frame
-           Frame object to write the measurement on
-       x1: upper_left_x co-ordinate of the bounding box whose measurements need to be written
+        Parameters
+        ----------
+        key_name: string
+            Name of the measurement.
+        val: float
+            Value of the measurement.
+        upper_left_x: int 
+            the upper_left_x co-ordinate of the bounding box
+        upper_left_y: int
+            the upper_left_y co-ordinate of the bounding box
+        frame: numpy array
+            Frame to write the measurement on
  
     """
-    key_name = key.name
     key_text_width, key_text_height = get_text_size(key_name, cv2.FONT_HERSHEY_SIMPLEX, 1)
 
     if math.isnan(val):
         val = 0
+        
     val_text = str(round(val, 2))
     val_text_width, val_text_height = get_text_size(val_text, cv2.FONT_HERSHEY_SIMPLEX, 1)
+    max_val_text_width = 83
+
+    key_val_width = key_text_width + max_val_text_width
  
-    key_val_width = key_text_width + val_text_width
- 
-    cv2.putText(frame, key_name + ": ", (abs(x1 - key_val_width - PADDING_FOR_SEPARATOR), upper_left_y),
+    cv2.putText(frame, key_name + ": ", (abs(upper_left_x - key_val_width - PADDING_FOR_SEPARATOR), upper_left_y),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 TEXT_SIZE,
                 (255, 255, 255))
-    cv2.putText(frame, val_text, (abs(x1 - val_text_width), upper_left_y),
+    cv2.putText(frame, val_text, (abs(upper_left_x - max_val_text_width + (max_val_text_width - val_text_width)), upper_left_y),
                 cv2.FONT_HERSHEY_SIMPLEX, TEXT_SIZE,
                 (255, 255, 255))
- 
 
-def display_left_metrics(key_name, val, upper_left_x, upper_left_y, frame):
+
+def draw_outlined_text(frame, text, x1, y1):
+    """
+    Draw outlined text.
+
+        Parameters
+        ----------
+        frame: numpy array
+            Frame to write the text on
+        text: string
+            Text to write
+        x1: int
+            Upper_left_x co-ordinate at which we start drawing the text
+        y1: int
+            Upper_left_y co-ordinate at which we start drawing the text
+    """
+    cv2.putText(frame, text, (x1, y1),
+                cv2.FONT_HERSHEY_DUPLEX,
+                TEXT_SIZE,
+                (0, 0,0), 4, cv2.LINE_AA)
+    cv2.putText(frame, text, (x1, y1),
+                cv2.FONT_HERSHEY_DUPLEX,
+                TEXT_SIZE,
+                (255, 255, 255), 1, cv2.LINE_AA)
+
+
+def draw_metric_rects(frame, metric_key, metric_val, x1, y1):
+    """
+    Draw the metric value indicator for the given metric.
+
+        Parameters
+        ----------
+        frame: numpy array
+            Frame to write the metric on
+        metric_key: string
+            Name of the metric
+        metric_val: int
+            Value of the metric
+        x1: int
+            Upper_left_x co-ordinate at which we start drawing the rectangles
+        y1: int
+            Upper_left_y co-ordinate at which we start drawing the rectangles
+    """
+    rect_width = 8
+    rect_height = 10
+    rect_padding = 2
+    num_rects = 10
+
+    rounded_val = round(abs(metric_val) / 10)
+    for i in range(0, num_rects):
+        if i < rounded_val:
+            if ('valence' in metric_key and metric_val < 0) or ('anger' in metric_key and metric_val > 0):
+                c = (0, 0, 255)
+            else:
+                c = (0, 204, 102)
+        else:
+            c = (186, 186, 186)
+
+        cv2.rectangle(frame, (x1, y1), (x1 + rect_width, y1 - rect_height), c, -1)
+   
+        x1 += 10
+
+
+def display_left_metric(key_name, val, upper_left_x, upper_left_y, frame):        
     """
     Display metrics on screen to the left of bounding box.
  
         Parameters
         ----------
         key_name: string
-            Name of the emotion.
+            Name of the metric.
         val: float
-            Value of the emotion.
+            Value of the metric.
         upper_left_x: int
             the upper_left_x co-ordinate of the bounding box
         upper_left_y: int
             the upper_left_y co-ordinate of the bounding box
-        frame: affvisionpy.Frame
-            Frame object to write the emotion on
+        frame: numpy array
+            Frame to write the metric on
  
     """
-    key_text_width, key_text_height = get_text_size(key_name, cv2.FONT_HERSHEY_SIMPLEX, 1)
+    key_text = key_name + ": "
+    text_width, key_text_height = get_text_size(key_text, cv2.FONT_HERSHEY_SIMPLEX, 1)
  
-    val_rect_width = 120
-    key_val_width = key_text_width + val_rect_width
-    cv2.putText(frame, key_name + ": ", (abs(upper_left_x - key_val_width), upper_left_y),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                TEXT_SIZE,
-                (0, 0,0), 4, cv2.LINE_AA)
-    cv2.putText(frame, key_name + ": ", (abs(upper_left_x - key_val_width), upper_left_y),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                TEXT_SIZE,
-                (255, 255, 255), 2, cv2.LINE_AA)
-    overlay = frame.copy()
- 
+    key_val_width = text_width + LEFT_METRIC_OFFSET
+    draw_outlined_text(frame, key_text, abs(upper_left_x - key_val_width), upper_left_y)
+
     if math.isnan(val):
         val = 0
  
-    start_box_point_x = abs(upper_left_x - val_rect_width)
-    width = 8
-    height = 10
- 
-    rounded_val = roundup(val)
-    rounded_val /= 10
-    rounded_val = abs(int(rounded_val))
- 
-    for i in range(0, rounded_val):
-        start_box_point_x += 10
-        cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
-                      (start_box_point_x + width, upper_left_y - height), (186, 186, 186), -1)
-        if ('valence' in key_name and val < 0) or ('anger' in key_name and val > 0):
-            cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
-                          (start_box_point_x + width, upper_left_y - height), (0, 0, 255), -1)
-        else:
-            cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
-                          (start_box_point_x + width, upper_left_y - height), (0, 204, 102), -1)
-    for i in range(rounded_val, 10):
-        start_box_point_x += 10
-        cv2.rectangle(overlay, (start_box_point_x, upper_left_y),
-                      (start_box_point_x + width, upper_left_y - height), (186, 186, 186), -1)
- 
-    alpha = 0.8
-    cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
- 
- 
-def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame):
+    draw_metric_rects(frame, key_name, val, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y)
+
+
+def display_gaze(frame, gaze_region_name, upper_left_x, upper_left_y):
+    """
+    Display gaze on screen to the left of the bounding box
+
+        Parameters
+        ----------
+        frame: numpy array
+            Frame to write the gaze metric on
+        gaze_region_name: string
+            Value of the gaze metric
+        upper_left_x: int
+            the upper_left_x co-ordinate of the bounding box
+        upper_left_y: int
+            the upper_left_y co-ordinate of the bounding box
+    """
+    gaze_text_size = 132  # this was precalculated
+    draw_outlined_text(frame, "gaze_region: ", abs(upper_left_x - gaze_text_size - LEFT_METRIC_OFFSET), upper_left_y)
+    draw_outlined_text(frame, gaze_region_name, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y)
+
+    
+def display_expressions(key_name, val, upper_right_x, upper_right_y, frame):
     """
     Display the expressions metrics on screen.
  
         Parameters
         ----------
-        key: affvisionpy.Expression
+        key_name: string
             Name of the expression.
         val: float
             Value of the expression.
@@ -250,59 +303,29 @@ def display_expressions_on_screen(key, val, upper_right_x, upper_right_y, frame)
             the upper_right_x co-ordinate of the bounding box
         upper_right_y: int
             the upper_right_y co-ordinate of the bounding box
-        frame: affvisionpy.Frame
-            Frame object to write the expression on
+        frame: numpy array
+            Frame to write the expression on
  
     """
-    key_name = key.name
-    val_rect_width = 120
-    overlay = frame.copy()
     if math.isnan(val):
         val = 0
  
-    if 'blink' not in key_name:
-        start_box_point_x = upper_right_x
-        width = 8
-        height = 10
- 
-        rounded_val = roundup(val)
-        rounded_val /= 10
-        rounded_val = int(rounded_val)
-        for i in range(0, rounded_val ):
-            start_box_point_x += 10
-            cv2.rectangle(overlay, (start_box_point_x, upper_right_y),
-                          (start_box_point_x + width, upper_right_y - height), (186, 186, 186), -1)
-            cv2.rectangle(overlay, (start_box_point_x, upper_right_y),
-                          (start_box_point_x + width, upper_right_y - height), (0, 204, 102), -1)
-        for i in range(rounded_val, 10):
-            start_box_point_x += 10
-            cv2.rectangle(overlay, (start_box_point_x, upper_right_y),
-                          (start_box_point_x + width, upper_right_y - height), (186, 186, 186), -1)
- 
-        alpha = 0.8
-        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+    if 'blink' in key_name:
+        draw_outlined_text(frame, str(val), upper_right_x + 10, upper_right_y)
     else:
-        cv2.putText(frame, str(val), (upper_right_x, upper_right_y), cv2.FONT_HERSHEY_DUPLEX, TEXT_SIZE,
-                    (0, 0, 0), 2, cv2.LINE_AA)
-        cv2.putText(frame, str(val), (upper_right_x, upper_right_y), cv2.FONT_HERSHEY_DUPLEX, TEXT_SIZE,
-                    (255, 255, 255), 1, cv2.LINE_AA)
- 
-    cv2.putText(frame, " :" + str(key_name), (upper_right_x + val_rect_width, upper_right_y), cv2.FONT_HERSHEY_DUPLEX,
-                TEXT_SIZE,
-                (0, 0, 0), 4, cv2.LINE_AA)
-    cv2.putText(frame, " :" + str(key_name), (upper_right_x + val_rect_width, upper_right_y), cv2.FONT_HERSHEY_DUPLEX,
-                TEXT_SIZE,
-                (255, 255, 255), 1, cv2.LINE_AA)
+        draw_metric_rects(frame, key_name, val, upper_right_x + 10, upper_right_y)
+
+    draw_outlined_text(frame, " :" + key_name, upper_right_x + LEFT_METRIC_OFFSET, upper_right_y)
  
 
-def display_identity_on_screen(frame, identity, upper_left_y, upper_left_x):
+def display_identity(frame, identity, upper_left_y, upper_left_x):
     """
         Display the face identity metrics on screen.
 
             Parameters
             ----------
-            frame: affvisionpy.Frame
-                Frame object to write the measurement on
+            frame: numpy array
+                Frame to write the measurement on
             identity: int
                 identity of the occupant in the current frame
             upper_left_y: upper left Y coordinate of the face bounding box
@@ -323,23 +346,40 @@ def display_identity_on_screen(frame, identity, upper_left_y, upper_left_x):
                 1, cv2.LINE_AA)
 
 
-def draw_affectiva_logo(frame, width, height):
+def get_affectiva_logo(frame_width, frame_height):
+    """
+    Return the properly sized logo for the given sized frame
+
+    Parameters
+    ----------
+    frame_width: int
+        width of the frame the logo will be placed in
+    frame_height: int
+        height of the frame the logo will be placed in
+    """
+    logo = cv2.imread(os.path.dirname(os.path.abspath(__file__))+"/Final logo - RGB Magenta.png")
+    logo_width = int(frame_width / 3)
+    logo_height = int(frame_height / 10)
+    logo = cv2.resize(logo, (logo_width, logo_height))
+    return logo
+
+
+def draw_affectiva_logo(frame, logo, width, height):
     """
     Place logo on the screen
  
         Parameters
         ----------
-        frame: affvisionpy.Frame
+        frame: numpy array
            Frame to place the logo on
+        logo: numpy array
+            Logo to place in the frame
         width: int
            width of the frame
         height: int
            height of the frame
     """
-    logo = cv2.imread(os.path.dirname(os.path.abspath(__file__))+"/Final logo - RGB Magenta.png")
-    logo_width = int(width / 3)
-    logo_height = int(height / 10)
-    logo = cv2.resize(logo, (logo_width, logo_height))
+    logo_height, logo_width = logo.shape[:2]
  
     y1, y2 = 0, logo_height
     x1, x2 = width - logo_width, width
@@ -358,9 +398,11 @@ def check_bounding_box_outside(width, height, bounding_box_dict):
         Parameters
         ----------
         width: int
-           width of the frame
+            width of the frame
         height: int
-           height of the frame
+            height of the frame
+        bounding_box_dict: int -> list of float
+            dictionary from face id to array of bbox points
  
     Returns
     -------
@@ -372,21 +414,3 @@ def check_bounding_box_outside(width, height, bounding_box_dict):
             return True
         return False
  
-
-def roundup(num):
-    """
-    Round up the number to the nearest 10.
- 
-       Parameters
-       ----------
-       num: int
-           number to be rounded up to 10.
- 
-       Returns
-       -------
-       int
-           Rounded up value of the number to 10
-    """
-    if (num / 10.0) < 5:
-        return int(math.floor(num / 10.0)) * 10
-    return int(math.ceil(num / 10.0)) * 10

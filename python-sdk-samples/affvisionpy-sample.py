@@ -9,7 +9,8 @@ import affvisionpy as af
 import cv2
  
 from listener import Listener
-from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo, get_bounding_box_points, identity_names_dict)
+from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, get_affectiva_logo, 
+                             draw_affectiva_logo, get_bounding_box_points, identity_names_dict)
 
 # Constants
 NOT_A_NUMBER = 'nan'
@@ -54,8 +55,8 @@ def run(csv_data):
             Values to hold for each frame
     """
     parser, args = parse_command_line()
-    input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height = get_command_line_parameters(
-        parser, args)
+    (input_file, data, max_num_of_faces, 
+    csv_file, output_file, frame_width, frame_height) = get_command_line_parameters(parser, args)
 
     if isinstance(input_file, int):
         start_time = time.time()         
@@ -72,7 +73,6 @@ def run(csv_data):
     detector.set_image_listener(listener)
  
     detector.start()
-
     captureFile = cv2.VideoCapture(input_file)
  
     if not args.video:
@@ -99,6 +99,8 @@ def run(csv_data):
     curr_timestamp = 0
     last_timestamp = 0
 
+    logo = get_affectiva_logo(file_width, file_height)
+    
     while captureFile.isOpened():
         # Capture frame-by-frame
         ret, frame = captureFile.read()
@@ -146,14 +148,14 @@ def run(csv_data):
 
                 write_metrics_to_csv_data_list(args, csv_data, round(curr_timestamp, 0), listener_metrics)
 
+
+                draw_affectiva_logo(frame, logo, width, height)
                 if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
                     draw_bounding_box(frame, listener_metrics)
-                    draw_affectiva_logo(frame, width, height)
                     draw_metrics(args, frame, listener_metrics)
-                    cv2.imshow('Processed Frame', frame)
-                else:
-                    draw_affectiva_logo(frame, width, height)
-                    cv2.imshow('Processed Frame', frame)
+                
+                cv2.imshow('Processed Frame', frame)
+
                 if output_file is not None:
                     out.write(frame)
  
@@ -267,7 +269,7 @@ def parse_command_line():
     args: argparse object of the command line
     """
     parser = argparse.ArgumentParser(description="Sample code for demoing affvisionpy module using a webcam or a video file.\n \
-        By default, the program will run with the camera parameter, displaying frames of size 1280 x 720.\n")
+        By default, the program will run with the camera parameter, displaying frames of size 1920 x 1080.\n")
     parser.add_argument("-d", "--data", dest="data", required=False, help="path to SDK data directory \
                         Alternatively, specify the path via the environment variable " + DATA_DIR_ENV_VAR)
     parser.add_argument("-i", "--input", dest="video", required=False,
@@ -280,7 +282,7 @@ def parse_command_line():
                         help="name of the output video file")
     parser.add_argument("-f", "--file", dest="file", required=False, default=DEFAULT_FILE_NAME,
                         help="name of the output CSV file")
-    parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1280, 720],
+    parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1920, 1080],
                         help="resolution in pixels (2-values): width height")
     parser.add_argument("--identity", dest="show_identity", action='store_true', help="show identity metrics")
     args = parser.parse_args()
