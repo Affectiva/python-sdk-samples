@@ -13,7 +13,7 @@ from listener import Listener as ImageListener
 from object_listener import ObjectListener as ObjectListener
 
 from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo,
-                             get_bounding_box_points, draw_objects)
+                             get_affectiva_logo, get_bounding_box_points, draw_objects)
 
 # Constants
 NOT_A_NUMBER = 'nan'
@@ -84,10 +84,12 @@ def run(csv_data):
     if output_file is not None:
         out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, (file_width, file_height))
 
+    logo = get_affectiva_logo(file_width, file_height)
+
     if args.show_faces:
-        process_face_input(detector, args, capture_file, input_file, start_time, output_file, out)
+        process_face_input(detector, args, capture_file, input_file, start_time, output_file, out, logo)
     elif args.show_object:
-        process_object_input(detector, capture_file, input_file, start_time, output_file, out)
+        process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo)
 
     capture_file.release()
     cv2.destroyAllWindows()
@@ -104,7 +106,7 @@ def run(csv_data):
         if not csv_file == DEFAULT_FILE_NAME:
             write_csv_data_to_file(csv_data, csv_file)
 
-def process_face_input(detector, args, capture_file, input_file, start_time, output_file, out):
+def process_face_input(detector, args, capture_file, input_file, start_time, output_file, out, logo):
     count = 0
     curr_timestamp = 0
     last_timestamp = 0
@@ -170,14 +172,14 @@ def process_face_input(detector, args, capture_file, input_file, start_time, out
 
                 write_face_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
 
+
+                draw_affectiva_logo(frame, logo, width, height)
                 if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
                     draw_bounding_box(frame, listener_metrics)
-                    draw_affectiva_logo(frame, width, height)
                     draw_metrics(frame, listener_metrics, identity_names_dict)
-                    cv2.imshow('Processed Frame', frame)
-                else:
-                    draw_affectiva_logo(frame, width, height)
-                    cv2.imshow('Processed Frame', frame)
+
+                cv2.imshow('Processed Frame', frame)
+
                 if output_file is not None:
                     out.write(frame)
 
@@ -189,9 +191,10 @@ def process_face_input(detector, args, capture_file, input_file, start_time, out
         else:
             break
 
-def process_object_input(detector, capture_file, input_file, start_time, output_file, out):
+def process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo):
     count = 0
     last_timestamp = 0
+
     # only enabling phones for now, TODO: add child seat later
     detector.enable_feature(af.Feature.phones)
 
@@ -244,7 +247,7 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
                 if len(objects) > 0 and not check_bounding_box_outside(width, height, listener_metrics["bounding_box"]):
                     draw_objects(frame, listener_metrics)
 
-                draw_affectiva_logo(frame, width, height)
+                draw_affectiva_logo(frame, logo, width, height)
                 cv2.imshow('Processed Frame', frame)
                 if output_file is not None:
                     out.write(frame)
@@ -376,7 +379,7 @@ def parse_command_line():
     args: argparse object of the command line
     """
     parser = argparse.ArgumentParser(description="Sample code for demoing affvisionpy module on webcam or a saved video file.\n \
-        By default, the program will run with the camera parameter displaying frames of size 1280 x 720.\n")
+        By default, the program will run with the camera parameter displaying frames of size 1920 x 1080.\n")
     parser.add_argument("-d", "--data", dest="data", required=False, help="path to directory containing the models. \
                         Alternatively, specify the path via the environment variable " + DATA_DIR_ENV_VAR + "=/path/to/data/")
     parser.add_argument("-i", "--input", dest="video", required=False,
@@ -389,7 +392,7 @@ def parse_command_line():
                         help="name of the output video file")
     parser.add_argument("-f", "--file", dest="file", required=False, default=DEFAULT_FILE_NAME,
                         help="name of the output CSV file")
-    parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1280, 720],
+    parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1920, 1080],
                         help="resolution in pixels (2-values): width height")
     parser.add_argument("--identity", dest="show_identity", action='store_true', help="show identity metrics")
     parser.add_argument("--object", dest="show_object", action='store_true', help="Enable object detection")
