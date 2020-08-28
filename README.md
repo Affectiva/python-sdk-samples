@@ -11,45 +11,45 @@ This script demonstrates how to use Affectiva's affvisionpy module to process fr
 
 ## Usage ##
 
-        python3 affvisionpy-sample.py <arguments>
+        python3 affvisionpy_sample.py <arguments>
 
 run with -h or --help to see documentation for all supported arguments        
  
-        python3 affvisionpy-sample.py -h
+        python3 affvisionpy_sample.py -h
 
 ## Example Usages:
 
 Run the script with a webcam.  **Note:** If the camera id is not supplied, by default the camera_id is set to 0.
     
-    python3 affvisionpy-sample.py -d </path/to/data/dir> -c <camera_id> -n <num_of_faces_to_detect>
+    python3 affvisionpy_sample.py -d </path/to/data/dir> -c <camera_id> -n <num_of_faces_to_detect>
 
 Run the script with a video file.
 
-    python3 affvisionpy-sample.py -d </path/to/data/vision> -n <num_of_faces_to_detect> -i </path/to/video/file>
+    python3 affvisionpy_sample.py -d </path/to/data/vision> -n <num_of_faces_to_detect> -i </path/to/video/file>
 
 Run the script with the default webcam.
 
-    python3 affvisionpy-sample.py -d </path/to/data/dir>
+    python3 affvisionpy_sample.py -d </path/to/data/dir>
     
 Run the script with the default webcam, limiting face detection to 1 face
     
-    python3 affvisionpy-sample.py -d </path/to/data/dir> -n 1
+    python3 affvisionpy_sample.py -d </path/to/data/dir> -n 1
 
 Run the script with the default webcam and with the identity feature enabled.
         
-    python3 affvisionpy-sample.py -d </path/to/data/dir> --identity
+    python3 affvisionpy_sample.py -d </path/to/data/dir> --identity
 
 Run the script with a 2nd webcam
     
-    python3 affvisionpy-sample.py -d </path/to/data/dir> -c 1
+    python3 affvisionpy_sample.py -d </path/to/data/dir> -c 1
         
 Run the script with a webcam and save the metrics to a CSV file named metrics.csv
 
-    python3 affvisionpy-sample.py -d </path/to/data/dir> -f metrics.csv
+    python3 affvisionpy_sample.py -d </path/to/data/dir> -f metrics.csv
 
 Run the script with a video file and save output video a file named metrics.avi
 
-    python3 affvisionpy-sample.py -d </path/to/data/dir> -i myvideo.mp4 -o metrics.avi
+    python3 affvisionpy_sample.py -d </path/to/data/dir> -i myvideo.mp4 -o metrics.avi
 
 
 ## Additional Notes ##
@@ -60,6 +60,8 @@ For both video and webcam options, the script displays real-time metrics on the 
 
 For the video option, the synchronous version of affvisionpy's FrameDetector will be used (SyncFrameDetector). 
 For the webcam option, the asynchronous version will be used (FrameDetector).
+
+Sample now supports Object and Occupant detection can be used with --object and --occupant respectively. If nothing is passed then Face detection is turned ON automatically.
 
 #### Eye gaze:
 
