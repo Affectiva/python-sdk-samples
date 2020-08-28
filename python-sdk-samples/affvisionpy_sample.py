@@ -11,9 +11,10 @@ import cv2
 
 from listener import Listener as ImageListener
 from object_listener import ObjectListener as ObjectListener
+from occupant_listener import OccupantListener as OccupantListener
 
 from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo,
-                             get_affectiva_logo, get_bounding_box_points, draw_objects)
+                             get_affectiva_logo, get_bounding_box_points, draw_objects, draw_occupants)
 
 # Constants
 NOT_A_NUMBER = 'nan'
@@ -22,6 +23,7 @@ DEFAULT_FRAME_HEIGHT = 1080
 DEFAULT_FILE_NAME = "default"
 DATA_DIR_ENV_VAR = "AFFECTIVA_VISION_DATA_DIR"
 OBJECT_CALLBACK_INTERVAL = 500
+OCCUPANT_CALLBACK_INTERVAL = 500
 
 HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence',
                     'interocular_distance',
@@ -35,6 +37,8 @@ HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRig
 
 HEADER_ROW_OBJECTS = ['TimeStamp', 'objectId', 'confidence', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY',
                       'ObjectType']
+
+HEADER_ROW_OCCUPANTS = ['TimeStamp', 'occupantId', 'confidence', 'regionId', 'regionType', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY']
 
 header_row = []
 
@@ -86,10 +90,13 @@ def run(csv_data):
 
     logo = get_affectiva_logo(file_width, file_height)
 
-    if args.show_faces:
+    if args.show_face:
         process_face_input(detector, args, capture_file, input_file, start_time, output_file, out, logo)
     elif args.show_object:
         process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo)
+    elif args.show_occupant:
+        process_occupant_input(detector, capture_file, input_file, start_time, output_file, out, logo)
+
 
     capture_file.release()
     cv2.destroyAllWindows()
@@ -204,6 +211,8 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
 
     detector.start()
 
+    print("Setting up object detection")
+
     while capture_file.isOpened():
         # Capture frame-by-frame
         ret, frame = capture_file.read()
@@ -246,6 +255,79 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
                 write_object_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
                 if len(objects) > 0 and not check_bounding_box_outside(width, height, listener_metrics["bounding_box"]):
                     draw_objects(frame, listener_metrics)
+
+                draw_affectiva_logo(frame, logo, width, height)
+                cv2.imshow('Processed Frame', frame)
+                if output_file is not None:
+                    out.write(frame)
+
+                if cv2.waitKey(1) == 27:
+                    break
+            else:
+                print("skipped a frame due to the timestamp not incrementing - old timestamp %f, new timestamp %f" % (
+                    last_timestamp, curr_timestamp))
+        else:
+            break
+
+
+def process_occupant_input(detector, capture_file, input_file, start_time, output_file, out, logo):
+    count = 0
+    last_timestamp = 0
+
+    detector.enable_features({af.Feature.faces, af.Feature.bodies, af.Feature.occupants})
+
+    # callback interval
+    listener = OccupantListener(OCCUPANT_CALLBACK_INTERVAL)
+    detector.set_occupant_listener(listener)
+
+    detector.start()
+    print("Setting up occupant detection")
+
+    while capture_file.isOpened():
+        # Capture frame-by-frame
+        ret, frame = capture_file.read()
+
+        if ret:
+            height = frame.shape[0]
+            width = frame.shape[1]
+            if isinstance(input_file, int):
+                curr_timestamp = (time.time() - start_time) * 1000.0
+            else:
+                curr_timestamp = int(capture_file.get(cv2.CAP_PROP_POS_MSEC))
+
+            # if there's a problem with the curr_timestamp, don't process the frame
+            if curr_timestamp > last_timestamp or count == 0:
+                last_timestamp = curr_timestamp
+                listener.time_metrics_dict['timestamp'] = curr_timestamp
+                afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(curr_timestamp))
+                count += 1
+
+                try:
+                    detector.process(afframe)
+
+                except Exception as exp:
+                    print(exp)
+
+                listener.mutex.acquire()
+                occupants = listener.occupants
+                bounding_box_dict = listener.bounding_box.copy()
+                confidence_dict = listener.confidence.copy()
+                region_id_dict = listener.regionId.copy()
+                region_dict = listener.region.copy()
+                region_type_dict = listener.regionType.copy()
+                listener.mutex.release()
+
+                listener_metrics = {
+                    "bounding_box": bounding_box_dict,
+                    "confidence": confidence_dict,
+                    "region_id": region_id_dict,
+                    "region": region_dict,
+                    "region_type": region_type_dict,
+                }
+
+                write_occupant_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
+                if len(occupants) > 0 and not check_bounding_box_outside(width, height, listener_metrics["bounding_box"]):
+                    draw_occupants(frame, listener_metrics)
 
                 draw_affectiva_logo(frame, logo, width, height)
                 cv2.imshow('Processed Frame', frame)
@@ -348,6 +430,43 @@ def write_object_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics)
             current_frame_data[field] = NOT_A_NUMBER
         csv_data.append(current_frame_data)
 
+def write_occupant_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
+    """
+    Write metrics per frame to a list
+
+        Parameters
+        ----------
+        csv_data:
+          list of per frame values to write to
+        timestamp: int
+           timestamp of each frame
+        listener_metrics: dict
+            dictionary of dictionaries, gives current listener state
+
+    """
+    global header_row
+    current_frame_data = {}
+    if "bounding_box" in listener_metrics:
+        for occid in listener_metrics["bounding_box"].keys():
+            current_frame_data["TimeStamp"] = timestamp
+            current_frame_data["occupantId"] = occid
+            upperLeftX, upperLeftY, lowerRightX, lowerRightY = get_bounding_box_points(occid,
+                                                                                       listener_metrics["bounding_box"])
+            current_frame_data["upperLeftX"] = upperLeftX
+            current_frame_data["upperLeftY"] = upperLeftY
+            current_frame_data["lowerRightX"] = lowerRightX
+            current_frame_data["lowerRightY"] = lowerRightY
+
+            current_frame_data["confidence"] = round(listener_metrics["confidence"][occid])
+            current_frame_data["regionId"] = listener_metrics["region_id"][occid]
+            current_frame_data["regionType"] = listener_metrics["region_type"][occid]
+            csv_data.append(current_frame_data)
+    else:
+        current_frame_data["TimeStamp"] = timestamp
+        for field in header_row[1:]:
+            current_frame_data[field] = NOT_A_NUMBER
+        csv_data.append(current_frame_data)
+
 def write_csv_data_to_file(csv_data, csv_file):
     """
     Place logo on the screen
@@ -394,9 +513,9 @@ def parse_command_line():
                         help="name of the output CSV file")
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1920, 1080],
                         help="resolution in pixels (2-values): width height")
-    parser.add_argument("--identity", dest="show_identity", action='store_true', help="show identity metrics")
+    parser.add_argument("--identity", dest="show_identity", action='store_true', help="show face with identity metrics")
     parser.add_argument("--object", dest="show_object", action='store_true', help="Enable object detection")
-    parser.add_argument("--faces", dest="show_faces", action='store_true', help="Enable face detection")
+    parser.add_argument("--occupant", dest="show_occupant", action='store_true', help="Enable face detection")
     args = parser.parse_args()
     return parser, args
 
@@ -454,19 +573,33 @@ def get_command_line_parameters(parser, args):
         parser.print_help()
         sys.exit(1)
 
+    args.show_face = False
+    # minimum feature check
+    if not (args.show_object or args.show_occupant):
+        print("Setting up face detection by default")
+        args.show_face = True
     # check for enabled feature request
-    if (args.show_identity or args.show_faces) and args.show_object:
-        print("ERROR: Can't enable faces/ identity with objects\n")
+    elif args.show_identity and args.show_object and args.show_occupant:
+        print("ERROR: Can't enable all features at same time\n")
+        parser.print_help()
+        sys.exit(1)
+    elif args.show_identity and args.show_object:
+        print("ERROR: Can't enable identity with objects\n")
+        parser.print_help()
+        sys.exit(1)
+    elif args.show_identity and args.show_occupant:
+        print("ERROR: Can't enable identity with occupants\n")
+        parser.print_help()
+        sys.exit(1)
+    elif args.show_object and args.show_occupant:
+        print("ERROR: Can't enable objects with occupants\n")
         parser.print_help()
         sys.exit(1)
 
-    if not (args.show_faces or args.show_object):
-        print("ERROR: need to enable atleast one of the detection type\n")
-        parser.print_help()
-        sys.exit(1)
+
 
     global header_row
-    if args.show_faces:
+    if args.show_face:
         header_row = HEADER_ROW_FACES
         if args.show_identity:
             global identity_names_dict
@@ -475,6 +608,8 @@ def get_command_line_parameters(parser, args):
             header_row.extend(['identity', 'name'])
     elif args.show_object:
         header_row = HEADER_ROW_OBJECTS
+    elif args.show_occupant:
+        header_row = HEADER_ROW_OCCUPANTS
 
     max_num_of_faces = int(args.num_faces)
     output_file = args.output

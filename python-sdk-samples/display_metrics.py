@@ -2,15 +2,16 @@
 import cv2
 import os
 import math
+import numpy as np
 
 TEXT_SIZE = 0.6
 PADDING_FOR_SEPARATOR = 5
 LEFT_METRIC_OFFSET = 105
+LINE_HEIGHT = 25
 
 IMAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
 
 def draw_metrics(frame, listener_metrics, identity_names_dict):
-
     """
     write metrics on screen
  
@@ -31,14 +32,14 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         metric = next(iter(gaze_metrics.values()))
         draw_gaze_region(frame, metric)
 
-    line_height = 25
     for fid in listener_metrics["measurements"].keys():
         measurements = listener_metrics["measurements"][fid]
         expressions = listener_metrics["expressions"][fid]
         emotions = listener_metrics["emotions"][fid]
         gaze_metric = listener_metrics["gaze_metric"][fid]
         glasses = listener_metrics["glasses"][fid]
-        identity = listener_metrics["identities"][fid]
+        if "identities" in listener_metrics:
+            identity = listener_metrics["identities"][fid]
         upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
 
         box_width = lower_right_x - upper_left_x
@@ -47,28 +48,27 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
 
         if "identities" in listener_metrics:
             display_identity(frame, identity, upper_left_y, upper_left_x, identity_names_dict)
- 
+
         for key, val in measurements.items():
             display_measurements(key.name, val, upper_left_y, frame, upper_left_x)
-            upper_left_y += line_height
+            upper_left_y += LINE_HEIGHT
 
         for key, val in emotions.items():
             display_left_metric(key.name, val, upper_left_x, upper_left_y, frame)
-            upper_left_y += line_height
+            upper_left_y += LINE_HEIGHT
 
         display_gaze(frame, gaze_metric.gaze_region.name, upper_left_x, upper_left_y)
-        upper_left_y += line_height
+        upper_left_y += LINE_HEIGHT
 
         display_left_metric("gaze_confidence", gaze_metric.confidence, upper_left_x, upper_left_y, frame)
-        upper_left_y += line_height
+        upper_left_y += LINE_HEIGHT
 
         display_left_metric("glasses", glasses, upper_left_x, upper_left_y, frame)
-        upper_left_y += line_height
+        upper_left_y += LINE_HEIGHT
 
         for key, val in expressions.items():
             display_expressions(key.name, val, upper_right_x, upper_right_y, frame)
-            upper_right_y += line_height
-
+            upper_right_y += LINE_HEIGHT
 
 def draw_outlined_text(frame, text, x1, y1):
     """
@@ -88,12 +88,11 @@ def draw_outlined_text(frame, text, x1, y1):
     cv2.putText(frame, text, (x1, y1),
                 cv2.FONT_HERSHEY_DUPLEX,
                 TEXT_SIZE,
-                (0, 0,0), 4, cv2.LINE_AA)
+                (0, 0, 0), 4, cv2.LINE_AA)
     cv2.putText(frame, text, (x1, y1),
                 cv2.FONT_HERSHEY_DUPLEX,
                 TEXT_SIZE,
                 (255, 255, 255), 1, cv2.LINE_AA)
-
 
 def draw_metric_rects(frame, metric_key, metric_val, x1, y1):
     """
@@ -119,22 +118,21 @@ def draw_metric_rects(frame, metric_key, metric_val, x1, y1):
 
     rounded_val = round(abs(metric_val) / 10)
     for i in range(0, num_rects):
-        c = (186,186,186)
+        c = (186, 186, 186)
 
         if i < rounded_val:
             if ('valence' in metric_key and metric_val < 0) or ('anger' in metric_key and metric_val > 0):
-                c = (0,0,255)
+                c = (0, 0, 255)
             else:
-                c = (0,204,102)
+                c = (0, 204, 102)
 
         cv2.rectangle(frame, (x1, y1), (x1 + rect_width, y1 - rect_height), c, -1)
 
         x1 += 10
 
-            
 def draw_objects(frame, listener_metrics):
     """
-    write objects with its bounding box on screen
+    draw objects with its bounding box on screen
 
         Parameters
         ----------
@@ -158,6 +156,78 @@ def draw_objects(frame, listener_metrics):
             obj_type = listener_metrics["object_type"][oid].name
             draw_outlined_text(frame, obj_type, upper_right_x, upper_right_y)
 
+def draw_occupants(frame, listener_metrics):
+    """
+    draw occupants with its bounding box on screen
+
+        Parameters
+        ----------
+        frame: numpy array
+            frame to write the metrics on
+
+        listener_metrics: dict
+            dictionary of dictionaries, gives current listener state
+
+    """
+    if "bounding_box" in listener_metrics:
+        for occid in listener_metrics["bounding_box"].keys():
+            upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(occid, listener_metrics[
+                "bounding_box"])
+
+            cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (199, 110, 255), 3)
+
+            if listener_metrics["region_id"][occid] != -1:
+                draw_polygon(listener_metrics["region"][occid], frame, (255, 255, 255))
+
+            # extra padding
+            upper_left_y -= LINE_HEIGHT
+
+            display_top_metrics("region_confidence", listener_metrics["confidence"][occid], upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+
+            region_type = listener_metrics["region_type"][occid]
+            region_id = str(listener_metrics["region_id"][occid])
+            display_top_metrics("region_id " + region_id, region_type, upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+            display_top_metrics("occupant_id", occid, upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+
+
+def display_top_metrics(key_name, val, upper_left_x, upper_left_y, frame):
+    """
+    Display metrics on right side of screen.
+
+        Parameters
+        ----------
+        key: string
+            Name of the metrics.
+        val: float
+            Value of the expression.
+        upper_left_x: int
+            the upper_left_x co-ordinate of the bounding box
+        upper_left_y: int
+            the upper_left_y co-ordinate of the bounding box
+        frame: numpy array
+            Frame object to write the expression on
+
+    """
+    key_text = key_name + ": "
+    text_width, key_text_height = get_text_size(key_text, cv2.FONT_HERSHEY_DUPLEX, 1)
+
+    draw_outlined_text(frame, key_text, upper_left_x, upper_left_y)
+
+    if 'region_confidence' in key_name:
+        if math.isnan(val):
+            val = 0
+        draw_metric_rects(frame, key_name, val, upper_left_x + text_width, upper_left_y)
+    else:
+        draw_outlined_text(frame, str(val), upper_left_x + text_width, upper_left_y)
+
+def draw_polygon(points, frame, color):
+    pts = []
+    for pt in points:
+        pts.append([int(pt.x), int(pt.y)])
+    cv2.polylines(frame, [np.array(pts)], True, color, 3)
 
 def get_bounding_box_points(fid, bounding_box_dict):
     """
@@ -318,7 +388,6 @@ def display_left_metric(key_name, val, upper_left_x, upper_left_y, frame):
 
     draw_metric_rects(frame, key_name, val, abs(upper_left_x - total_rect_width), upper_left_y)
 
-
 def display_expressions(key_name, val, upper_right_x, upper_right_y, frame):
     """
     Display the expressions metrics on screen.
@@ -345,10 +414,9 @@ def display_expressions(key_name, val, upper_right_x, upper_right_y, frame):
         draw_metric_rects(frame, key_name, val, upper_right_x + 10, upper_right_y)
 
     else:
-        draw_outlined_text(frame, str(val), upper_right_x + 10, upper_right_y) 
+        draw_outlined_text(frame, str(val), upper_right_x + 10, upper_right_y)
 
     draw_outlined_text(frame, " :" + key_name, upper_right_x + LEFT_METRIC_OFFSET, upper_right_y)
-
 
 def display_identity(frame, identity, upper_left_y, upper_left_x, identity_names_dict):
     """
@@ -377,7 +445,6 @@ def display_identity(frame, identity, upper_left_y, upper_left_x, identity_names
     cv2.putText(frame, id_name, (upper_left_x, upper_left_y - 10), cv2.FONT_HERSHEY_DUPLEX, TEXT_SIZE, (255, 255, 255),
                 1, cv2.LINE_AA)
 
-
 def get_affectiva_logo(frame_width, frame_height):
     """
     Return the properly sized logo for the given sized frame
@@ -389,12 +456,11 @@ def get_affectiva_logo(frame_width, frame_height):
     frame_height: int
         height of the frame the logo will be placed in
     """
-    logo = cv2.imread(IMAGES_DIR+"/Final logo - RGB Magenta.png")
+    logo = cv2.imread(IMAGES_DIR + "/Final logo - RGB Magenta.png")
     logo_width = int(frame_width / 3)
     logo_height = int(frame_height / 10)
     logo = cv2.resize(logo, (logo_width, logo_height))
     return logo
-
 
 def draw_affectiva_logo(frame, logo, width, height):
     """
@@ -412,7 +478,7 @@ def draw_affectiva_logo(frame, logo, width, height):
            height of the frame
     """
     logo_height, logo_width = logo.shape[:2]
-    
+
     y1, y2 = 0, logo_height
     x1, x2 = width - logo_width, width
     # Remove the white background from the logo so that only the word "Affectiva" is visible on screen
@@ -447,7 +513,6 @@ def draw_gaze_region(frame, gaze_metric):
 
     for c in range(0, 3):
         frame[y1:y2, x1:x2, c] = (alpha * img[:, :, c] + alpha_frame * frame[y1:y2, x1:x2, c])
-
 
 def check_bounding_box_outside(width, height, bounding_box_dict):
     """
