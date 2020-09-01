@@ -195,11 +195,11 @@ def draw_occupants(frame, listener_metrics):
 
 def display_top_metrics(key_name, val, upper_left_x, upper_left_y, frame):
     """
-    Display metrics on right side of screen.
+    Display metrics on top of bounding box.
 
         Parameters
         ----------
-        key: string
+        key_name: string
             Name of the metrics.
         val: float
             Value of the expression.
