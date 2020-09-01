@@ -503,7 +503,7 @@ def parse_command_line():
                         help="name of the output CSV file")
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1920, 1080],
                         help="resolution in pixels (2-values): width height")
-    parser.add_argument("--identity", dest="show_identity", action='store_true', help="show face with identity metrics")
+    parser.add_argument("--face_id", dest="show_identity", action='store_true', help="show face with identity metrics")
     parser.add_argument("--object", dest="show_objects", action='store_true', help="Enable object detection")
     parser.add_argument("--occupant", dest="show_occupants", action='store_true', help="Enable face detection")
     args = parser.parse_args()

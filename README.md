@@ -37,7 +37,7 @@ Run the script with the default webcam, limiting face detection to 1 face
 
 Run the script with the default webcam and with the identity feature enabled.
         
-    python3 affvisionpy_sample.py -d </path/to/data/dir> --identity
+    python3 affvisionpy_sample.py -d </path/to/data/dir> --face_id
 
 Run the script with a 2nd webcam
     
