@@ -9,11 +9,12 @@ from collections import defaultdict
 import affvisionpy as af
 import cv2
 
-from listener import Listener as ImageListener
+from face_listener import FaceListener as ImageListener
 from object_listener import ObjectListener as ObjectListener
+from occupant_listener import OccupantListener as OccupantListener
 
 from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo,
-                             get_affectiva_logo, get_bounding_box_points, draw_objects)
+                             get_affectiva_logo, get_bounding_box_points, draw_objects, draw_occupants)
 
 # Constants
 NOT_A_NUMBER = 'nan'
@@ -22,6 +23,7 @@ DEFAULT_FRAME_HEIGHT = 1080
 DEFAULT_FILE_NAME = "default"
 DATA_DIR_ENV_VAR = "AFFECTIVA_VISION_DATA_DIR"
 OBJECT_CALLBACK_INTERVAL = 500
+OCCUPANT_CALLBACK_INTERVAL = 500
 
 HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence',
                     'interocular_distance',
@@ -35,6 +37,8 @@ HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRig
 
 HEADER_ROW_OBJECTS = ['TimeStamp', 'objectId', 'confidence', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY',
                       'ObjectType']
+
+HEADER_ROW_OCCUPANTS = ['TimeStamp', 'occupantId', 'confidence', 'regionId', 'regionType', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY']
 
 header_row = []
 
@@ -50,7 +54,7 @@ def run(csv_data):
             Values to hold for each frame
     """
     parser, args = parse_command_line()
-    input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height = get_command_line_parameters(
+    input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_faces = get_command_line_parameters(
         parser, args)
 
     start_time = 0
@@ -86,10 +90,13 @@ def run(csv_data):
 
     logo = get_affectiva_logo(file_width, file_height)
 
-    if args.show_faces:
+    if show_faces:
         process_face_input(detector, args, capture_file, input_file, start_time, output_file, out, logo)
-    elif args.show_object:
+    elif args.show_objects:
         process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo)
+    elif args.show_occupants:
+        process_occupant_input(detector, capture_file, input_file, start_time, output_file, out, logo)
+
 
     capture_file.release()
     cv2.destroyAllWindows()
@@ -108,7 +115,6 @@ def run(csv_data):
 
 def process_face_input(detector, args, capture_file, input_file, start_time, output_file, out, logo):
     count = 0
-    curr_timestamp = 0
     last_timestamp = 0
 
     features = {af.Feature.expressions, af.Feature.emotions, af.Feature.gaze, af.Feature.appearances}
@@ -147,7 +153,7 @@ def process_face_input(detector, args, capture_file, input_file, start_time, out
                     print(exp)
 
                 listener.mutex.acquire()
-                faces = listener.faces
+                faces = listener.faces.copy()
                 measurements_dict = listener.measurements_dict.copy()
                 expressions_dict = listener.expressions_dict.copy()
                 emotions_dict = listener.emotions_dict.copy()
@@ -202,6 +208,7 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
     listener = ObjectListener(OBJECT_CALLBACK_INTERVAL)
     detector.set_object_listener(listener)
 
+    print("Setting up object detection")
     detector.start()
 
     while capture_file.isOpened():
@@ -231,7 +238,7 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
                     print(exp)
 
                 listener.mutex.acquire()
-                objects = listener.objects
+                objects = listener.objects.copy()
                 bounding_box_dict = listener.bounding_box.copy()
                 confidence_dict = listener.confidence.copy()
                 type_dict = listener.type.copy()
@@ -246,6 +253,79 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
                 write_object_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
                 if len(objects) > 0 and not check_bounding_box_outside(width, height, listener_metrics["bounding_box"]):
                     draw_objects(frame, listener_metrics)
+
+                draw_affectiva_logo(frame, logo, width, height)
+                cv2.imshow('Processed Frame', frame)
+                if output_file is not None:
+                    out.write(frame)
+
+                if cv2.waitKey(1) == 27:
+                    break
+            else:
+                print("skipped a frame due to the timestamp not incrementing - old timestamp %f, new timestamp %f" % (
+                    last_timestamp, curr_timestamp))
+        else:
+            break
+
+
+def process_occupant_input(detector, capture_file, input_file, start_time, output_file, out, logo):
+    count = 0
+    last_timestamp = 0
+
+    detector.enable_features({af.Feature.faces, af.Feature.bodies, af.Feature.occupants})
+
+    # callback interval
+    listener = OccupantListener(OCCUPANT_CALLBACK_INTERVAL)
+    detector.set_occupant_listener(listener)
+
+    print("Setting up occupant detection")
+    detector.start()
+
+    while capture_file.isOpened():
+        # Capture frame-by-frame
+        ret, frame = capture_file.read()
+
+        if ret:
+            height = frame.shape[0]
+            width = frame.shape[1]
+            if isinstance(input_file, int):
+                curr_timestamp = (time.time() - start_time) * 1000.0
+            else:
+                curr_timestamp = int(capture_file.get(cv2.CAP_PROP_POS_MSEC))
+
+            # if there's a problem with the curr_timestamp, don't process the frame
+            if curr_timestamp > last_timestamp or count == 0:
+                last_timestamp = curr_timestamp
+                listener.time_metrics_dict['timestamp'] = curr_timestamp
+                afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(curr_timestamp))
+                count += 1
+
+                try:
+                    detector.process(afframe)
+
+                except Exception as exp:
+                    print(exp)
+
+                listener.mutex.acquire()
+                occupants = listener.occupants.copy()
+                bounding_box_dict = listener.bounding_box.copy()
+                confidence_dict = listener.confidence.copy()
+                region_id_dict = listener.regionId.copy()
+                region_dict = listener.region.copy()
+                region_type_dict = listener.regionType.copy()
+                listener.mutex.release()
+
+                listener_metrics = {
+                    "bounding_box": bounding_box_dict,
+                    "confidence": confidence_dict,
+                    "region_id": region_id_dict,
+                    "region": region_dict,
+                    "region_type": region_type_dict,
+                }
+
+                write_occupant_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
+                if len(occupants) > 0 and not check_bounding_box_outside(width, height, listener_metrics["bounding_box"]):
+                    draw_occupants(frame, listener_metrics)
 
                 draw_affectiva_logo(frame, logo, width, height)
                 cv2.imshow('Processed Frame', frame)
@@ -275,22 +355,15 @@ def write_face_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
  
     """
     global header_row
+    current_frame_data = {}
     if not listener_metrics["measurements"].keys():
-        current_frame_data = {}
-        current_frame_data["TimeStamp"] = timestamp
-        for field in header_row[1:]:
-            current_frame_data[field] = NOT_A_NUMBER
-        csv_data.append(current_frame_data)
+        write_default_csv_data(current_frame_data, timestamp)
     else:
         for fid in listener_metrics["measurements"].keys():
-            current_frame_data = {}
             current_frame_data["TimeStamp"] = timestamp
             current_frame_data["faceId"] = fid
-            upperLeftX, upperLeftY, lowerRightX, lowerRightY = get_bounding_box_points(fid, listener_metrics["bounding_box"])
-            current_frame_data["upperLeftX"] = upperLeftX
-            current_frame_data["upperLeftY"] = upperLeftY
-            current_frame_data["lowerRightX"] = lowerRightX
-            current_frame_data["lowerRightY"] = lowerRightY
+            write_bbox_metrics_to_csv(fid, listener_metrics, current_frame_data)
+
             for key, val in listener_metrics["measurements"][fid].items():
                 current_frame_data[key.name] = round(val, 4)
             for key, val in listener_metrics["emotions"][fid].items():
@@ -329,24 +402,60 @@ def write_object_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics)
     global header_row
     current_frame_data = {}
     if "object_type" in listener_metrics:
-        for oid in listener_metrics["object_type"].keys():
+        for obj_id in listener_metrics["object_type"].keys():
             current_frame_data["TimeStamp"] = timestamp
-            current_frame_data["objectId"] = oid
-            upperLeftX, upperLeftY, lowerRightX, lowerRightY = get_bounding_box_points(oid,
-                                                                                       listener_metrics["bounding_box"])
-            current_frame_data["upperLeftX"] = upperLeftX
-            current_frame_data["upperLeftY"] = upperLeftY
-            current_frame_data["lowerRightX"] = lowerRightX
-            current_frame_data["lowerRightY"] = lowerRightY
+            current_frame_data["objectId"] = obj_id
+            write_bbox_metrics_to_csv(obj_id, listener_metrics, current_frame_data)
 
-            current_frame_data["confidence"] = round(listener_metrics["confidence"][oid])
-            current_frame_data["ObjectType"] = listener_metrics["object_type"][oid].name
+            current_frame_data["confidence"] = round(listener_metrics["confidence"][obj_id])
+            current_frame_data["ObjectType"] = listener_metrics["object_type"][obj_id].name
             csv_data.append(current_frame_data)
     else:
-        current_frame_data["TimeStamp"] = timestamp
-        for field in header_row[1:]:
-            current_frame_data[field] = NOT_A_NUMBER
-        csv_data.append(current_frame_data)
+        write_default_csv_data(current_frame_data, timestamp)
+
+def write_occupant_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
+    """
+    Write metrics per frame to a list
+
+        Parameters
+        ----------
+        csv_data:
+          list of per frame values to write to
+        timestamp: int
+           timestamp of each frame
+        listener_metrics: dict
+            dictionary of dictionaries, gives current listener state
+
+    """
+    global header_row
+    current_frame_data = {}
+    if "bounding_box" in listener_metrics:
+        for occ_id in listener_metrics["bounding_box"].keys():
+            current_frame_data["TimeStamp"] = timestamp
+            current_frame_data["occupantId"] = occ_id
+            write_bbox_metrics_to_csv(occ_id, listener_metrics, current_frame_data)
+
+            current_frame_data["confidence"] = round(listener_metrics["confidence"][occ_id])
+            current_frame_data["regionId"] = listener_metrics["region_id"][occ_id]
+            current_frame_data["regionType"] = listener_metrics["region_type"][occ_id]
+            csv_data.append(current_frame_data)
+    else:
+        write_default_csv_data(current_frame_data, timestamp)
+
+
+def write_bbox_metrics_to_csv(id, listener_metrics, current_frame_data):
+    upperLeftX, upperLeftY, lowerRightX, lowerRightY = get_bounding_box_points(id,
+                                                                               listener_metrics["bounding_box"])
+    current_frame_data["upperLeftX"] = upperLeftX
+    current_frame_data["upperLeftY"] = upperLeftY
+    current_frame_data["lowerRightX"] = lowerRightX
+    current_frame_data["lowerRightY"] = lowerRightY
+
+def write_default_csv_data(current_frame_data, timestamp):
+    current_frame_data["TimeStamp"] = timestamp
+    for field in header_row[1:]:
+        current_frame_data[field] = NOT_A_NUMBER
+    csv_data.append(current_frame_data)
 
 def write_csv_data_to_file(csv_data, csv_file):
     """
@@ -394,9 +503,9 @@ def parse_command_line():
                         help="name of the output CSV file")
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1920, 1080],
                         help="resolution in pixels (2-values): width height")
-    parser.add_argument("--identity", dest="show_identity", action='store_true', help="show identity metrics")
-    parser.add_argument("--object", dest="show_object", action='store_true', help="Enable object detection")
-    parser.add_argument("--faces", dest="show_faces", action='store_true', help="Enable face detection")
+    parser.add_argument("--face_id", dest="show_identity", action='store_true', help="show face with identity metrics")
+    parser.add_argument("--object", dest="show_objects", action='store_true', help="Enable object detection")
+    parser.add_argument("--occupant", dest="show_occupants", action='store_true', help="Enable face detection")
     args = parser.parse_args()
     return parser, args
 
@@ -454,34 +563,50 @@ def get_command_line_parameters(parser, args):
         parser.print_help()
         sys.exit(1)
 
+    show_face = False
+    # minimum feature check
+    if not (args.show_objects or args.show_occupants):
+        print("Setting up face detection by default")
+        show_face = True
     # check for enabled feature request
-    if (args.show_identity or args.show_faces) and args.show_object:
-        print("ERROR: Can't enable faces/ identity with objects\n")
+    elif args.show_identity and args.show_objects and args.show_occupants:
+        print("ERROR: Can't enable all features at same time\n")
+        parser.print_help()
+        sys.exit(1)
+    elif args.show_identity and args.show_objects:
+        print("ERROR: Can't enable identity with objects\n")
+        parser.print_help()
+        sys.exit(1)
+    elif args.show_identity and args.show_occupants:
+        print("ERROR: Can't enable identity with occupants\n")
+        parser.print_help()
+        sys.exit(1)
+    elif args.show_objects and args.show_occupants:
+        print("ERROR: Can't enable objects with occupants\n")
         parser.print_help()
         sys.exit(1)
 
-    if not (args.show_faces or args.show_object):
-        print("ERROR: need to enable atleast one of the detection type\n")
-        parser.print_help()
-        sys.exit(1)
+
 
     global header_row
-    if args.show_faces:
+    if show_face:
         header_row = HEADER_ROW_FACES
         if args.show_identity:
             global identity_names_dict
             # read in the csv file that maps identities to names
             identity_names_dict = read_identities_csv(data)
             header_row.extend(['identity', 'name'])
-    elif args.show_object:
+    elif args.show_objects:
         header_row = HEADER_ROW_OBJECTS
+    elif args.show_occupants:
+        header_row = HEADER_ROW_OCCUPANTS
 
     max_num_of_faces = int(args.num_faces)
     output_file = args.output
     csv_file = args.file
     frame_width = int(args.res[0])
     frame_height = int(args.res[1])
-    return input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height
+    return input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_face
 
 
 if __name__ == "__main__":

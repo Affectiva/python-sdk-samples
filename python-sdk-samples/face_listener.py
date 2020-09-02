@@ -3,13 +3,13 @@ from collections import defaultdict
 from threading import Lock
 import affvisionpy as af
 
-class Listener(af.ImageListener):
+class FaceListener(af.ImageListener):
     """
     Listener class that return metrics for processed frames.
  
     """
     def __init__(self):
-        super(Listener, self).__init__()
+        super(FaceListener, self).__init__()
         
         self.count = 0
         self.process_last_ts = 0.0
