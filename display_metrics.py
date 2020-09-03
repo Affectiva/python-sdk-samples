@@ -4,6 +4,8 @@ import os
 import math
 import numpy as np
 
+from body_listener import EDGES, COLORS
+
 TEXT_SIZE = 0.6
 PADDING_FOR_SEPARATOR = 5
 LEFT_METRIC_OFFSET = 105
@@ -14,7 +16,7 @@ IMAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
 def draw_metrics(frame, listener_metrics, identity_names_dict):
     """
     write metrics on screen
- 
+
         Parameters
         ----------
         args: parsed command line arguments
@@ -24,7 +26,7 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
 
         listener_metrics: dict
             dictionary of dictionaries, gives current listener state
- 
+
     """
     # draw gaze region for the first face. (ideally we should draw it for the driver only)
     gaze_metrics = listener_metrics["gaze_metric"]
@@ -147,14 +149,38 @@ def draw_objects(frame, listener_metrics):
         for oid in listener_metrics["object_type"].keys():
             upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(oid, listener_metrics[
                 "bounding_box"])
-            box_width = lower_right_x - upper_left_x
-            upper_right_x = upper_left_x + box_width
-            upper_right_y = upper_left_y
 
-            cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 0, 255), 3)
+            if listener_metrics["region_id"][oid] != -1:
+                draw_polygon(listener_metrics["region"][oid], frame, (255, 255, 255))
 
             obj_type = listener_metrics["object_type"][oid].name
-            draw_outlined_text(frame, obj_type, upper_right_x, upper_right_y)
+            # default color == GRAY
+            color = (128, 128, 128)
+            if "phone" in obj_type:
+                # phone color == YELLOW
+                color = (0, 255, 255)
+            elif "child_seat" in obj_type:
+                # child seat color == RED
+                color = (0, 0, 255)
+
+            cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), color, 3)
+
+            # extra padding
+            upper_left_y -= LINE_HEIGHT
+
+            display_top_metrics("type", obj_type, upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+
+            display_top_metrics("object_confidence", listener_metrics["confidence"][oid], upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+            display_top_metrics("region_confidence", listener_metrics["region_confidence"][oid], upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+
+            region_type = listener_metrics["region_type"][oid]
+            region_id = str(listener_metrics["region_id"][oid])
+            display_top_metrics("region_id " + region_id, region_type, upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+
 
 def draw_occupants(frame, listener_metrics):
     """
@@ -191,7 +217,30 @@ def draw_occupants(frame, listener_metrics):
             upper_left_y -= LINE_HEIGHT
             display_top_metrics("occupant_id", occid, upper_left_x, upper_left_y, frame)
             upper_left_y -= LINE_HEIGHT
+            draw_bodies(frame, listener_metrics)
 
+def draw_bodies(frame, listener_metrics):
+    """
+    draw bodies points with edges on screen
+
+        Parameters
+        ----------
+        frame: numpy array
+            frame to write the metrics on
+
+        listener_metrics: dict
+            dictionary of dictionaries, gives current listener state
+
+    """
+
+    if "body_points" in listener_metrics:
+        for body_point in listener_metrics["body_points"].values():
+            body_point_keys = body_point.keys()
+            for edge_order, edge in enumerate(EDGES):
+                if edge[0] in body_point_keys and edge[1] in body_point_keys:
+                    start = body_point[edge[0]]
+                    end = body_point[edge[1]]
+                    cv2.line(frame, (start[0], start[1]), (end[0], end[1]), COLORS[edge_order], 3)
 
 def display_top_metrics(key_name, val, upper_left_x, upper_left_y, frame):
     """
@@ -216,7 +265,7 @@ def display_top_metrics(key_name, val, upper_left_x, upper_left_y, frame):
 
     draw_outlined_text(frame, key_text, upper_left_x, upper_left_y)
 
-    if 'region_confidence' in key_name:
+    if 'region_confidence' in key_name or 'object_confidence' in key_name:
         if math.isnan(val):
             val = 0
         draw_metric_rects(frame, key_name, val, upper_left_x + text_width, upper_left_y)
@@ -232,7 +281,7 @@ def draw_polygon(points, frame, color):
 def get_bounding_box_points(fid, bounding_box_dict):
     """
     Fetch upper_left_x, upper_left_y, lower_right_x, lwoer_right_y points of the bounding box.
- 
+
         Parameters
         ----------
         fid: int
@@ -240,7 +289,7 @@ def get_bounding_box_points(fid, bounding_box_dict):
 
         bounding_box_dict: int -> list of float
             dictionary from face id to array of bbox points
- 
+
         Returns
         -------
         tuple of int values
@@ -254,7 +303,7 @@ def get_bounding_box_points(fid, bounding_box_dict):
 def draw_bounding_box(frame, listener_metrics):
     """
     For each frame, draw the bounding box on screen.
- 
+
         Parameters
         ----------
         frame: numpy array
@@ -262,7 +311,7 @@ def draw_bounding_box(frame, listener_metrics):
 
         listener_metrics: dict
             dictionary of dictionaries, gives current listener state
- 
+
     """
     emotion_value_threshold = 5
     for fid in listener_metrics["bounding_box"].keys():
@@ -285,7 +334,7 @@ def draw_bounding_box(frame, listener_metrics):
 def get_text_size(text, font, thickness):
     """
     Get the size occupied by a particular text string
- 
+
        Parameters
        ----------
        text: str
@@ -294,7 +343,7 @@ def get_text_size(text, font, thickness):
            font size of the text string
        thickness: int
            thickness of the font
- 
+
        Returns
        -------
        tuple of int values
@@ -306,7 +355,7 @@ def get_text_size(text, font, thickness):
 def display_gaze(frame, gaze_region_name, upper_left_x, upper_left_y):
     """
     Display gaze on screen to the left of the bounding box
-        
+
         Parameters
         ----------
         frame: numpy array
@@ -325,10 +374,10 @@ def display_gaze(frame, gaze_region_name, upper_left_x, upper_left_y):
 def display_measurements(key_name, val, upper_left_y, frame, x1):
     """
     Display the measurement metrics on screen.
- 
+
        Parameters
        ----------
-       key_name: string 
+       key_name: string
            Name of the measurement.
        val: float
            Value of the measurement.
@@ -336,9 +385,9 @@ def display_measurements(key_name, val, upper_left_y, frame, x1):
            the upper_left_y co-ordinate of the bounding box
        frame: numpy array
            Frame object to write the measurement on
-       x1: int 
+       x1: int
            upper_left_x co-ordinate of the bounding box whose measurements need to be written
- 
+
     """
     key_text_width, key_text_height = get_text_size(key_name, cv2.FONT_HERSHEY_SIMPLEX, 1)
 
@@ -360,7 +409,7 @@ def display_measurements(key_name, val, upper_left_y, frame, x1):
 def display_left_metric(key_name, val, upper_left_x, upper_left_y, frame):
     """
     Display metrics on screen to the left of bounding box.
- 
+
         Parameters
         ----------
         key_name: string
@@ -373,7 +422,7 @@ def display_left_metric(key_name, val, upper_left_x, upper_left_y, frame):
             the upper_left_y co-ordinate of the bounding box
         frame: numpy array
             Frame object to write the metric on
- 
+
     """
     key_text = key_name + ": "
     text_width, key_text_height = get_text_size(key_text, cv2.FONT_HERSHEY_DUPLEX, 1)
@@ -391,7 +440,7 @@ def display_left_metric(key_name, val, upper_left_x, upper_left_y, frame):
 def display_expressions(key_name, val, upper_right_x, upper_right_y, frame):
     """
     Display the expressions metrics on screen.
- 
+
         Parameters
         ----------
         key: string
@@ -404,7 +453,7 @@ def display_expressions(key_name, val, upper_right_x, upper_right_y, frame):
             the upper_right_y co-ordinate of the bounding box
         frame: numpy array
             Frame object to write the expression on
- 
+
     """
     val_rect_width = 120
     if math.isnan(val):
@@ -465,7 +514,7 @@ def get_affectiva_logo(frame_width, frame_height):
 def draw_affectiva_logo(frame, logo, width, height):
     """
     Place logo on the screen
- 
+
         Parameters
         ----------
         frame: numpy array
@@ -517,7 +566,7 @@ def draw_gaze_region(frame, gaze_metric):
 def check_bounding_box_outside(width, height, bounding_box_dict):
     """
     Check if bounding box values are going outside the screen in case of face going outside
- 
+
         Parameters
         ----------
         width: int
@@ -526,7 +575,7 @@ def check_bounding_box_outside(width, height, bounding_box_dict):
            height of the frame
         bounding_box_dict: int -> list of float
             dictionary from face id to array of bbox points
- 
+
     Returns
     -------
     boolean: indicating if the bounding box is outside the frame or not

@@ -3,6 +3,7 @@ from collections import defaultdict
 from threading import Lock
 import affvisionpy as af
 
+
 class OccupantListener(af.OccupantListener):
     """
     OccupantListener class that return occupant metrics for processed frames.
@@ -16,13 +17,14 @@ class OccupantListener(af.OccupantListener):
         self.process_last_ts = 0.0
         self.occupant_interval = occupant_interval
         self.mutex = Lock()
-        self.time_metrics_dict = defaultdict()
         self.occupants = defaultdict()
         self.confidence = defaultdict()
         self.bounding_box = defaultdict()
         self.regionId = defaultdict()
         self.region = defaultdict()
         self.regionType = defaultdict()
+        self.bodyId = defaultdict()
+        self.bodyPoints = defaultdict()
 
     def results_updated(self, occupants, frame):
         timestamp = frame.timestamp()
@@ -50,6 +52,17 @@ class OccupantListener(af.OccupantListener):
             self.regionType[occid] = occ.matched_seat.cabin_region.type.name
             if self.regionId[occid] != -1:
                 self.region[occid] = occ.matched_seat.cabin_region.vertices
+            # TODO: research the bug where we are not able to access object directly and gives "munmap_chunk(): invalid pointer"
+            # body_occ = occ.body
+            # if body_occ is not None:
+            #     self.bodyId[occid] = body_occ.body_id
+            #     b_pts = body_occ.body_points
+            #     body_points = {}
+            #     for b_pt, pt in b_pts.items():
+            #         body_points[b_pt.name] = [int(pt.x), int(pt.y)]
+            #     self.bodyPoints[occid] = body_points
+            # else:
+            self.bodyId[occid] = "nan"
             self.confidence[occid] = occ.matched_seat.match_confidence
         self.mutex.release()
 
@@ -60,8 +73,10 @@ class OccupantListener(af.OccupantListener):
         """
         Clears the dictionary values
         """
-        self.confidence = defaultdict()
-        self.bounding_box = defaultdict()
-        self.regionId = defaultdict()
-        self.region = defaultdict()
-        self.regionType = defaultdict()
+        self.confidence.clear()
+        self.bounding_box.clear()
+        self.regionId.clear()
+        self.region.clear()
+        self.regionType.clear()
+        self.bodyId.clear()
+        self.bodyPoints.clear()

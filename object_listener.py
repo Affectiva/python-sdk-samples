@@ -14,13 +14,18 @@ class ObjectListener(af.ObjectListener):
 
         self.count = 0
         self.process_last_ts = 0.0
-        self.object_interval = object_interval
         self.mutex = Lock()
-        self.time_metrics_dict = defaultdict()
         self.objects = defaultdict()
         self.confidence = defaultdict()
         self.bounding_box = defaultdict()
+        self.region = defaultdict()
+        self.regionId = defaultdict()
+        self.regionConfidence = defaultdict()
+        self.regionType = defaultdict()
         self.type = defaultdict()
+        self.callback = defaultdict()
+        self.callback[af.Feature.phones] = object_interval
+        self.callback[af.Feature.child_seats] = object_interval
 
     def results_updated(self, objects, frame):
         timestamp = frame.timestamp()
@@ -46,20 +51,24 @@ class ObjectListener(af.ObjectListener):
                                       bbox.getBottomRight().y]
             self.type[oid] = obj.type
             self.confidence[oid] = obj.confidence
+            self.regionId[oid] = obj.matched_regions[0].cabin_region.id
+            self.regionConfidence[oid] = obj.matched_regions[0].match_confidence
+            self.regionType[oid] = obj.matched_regions[0].cabin_region.type.name
+            if self.regionId[oid] != -1:
+                self.region[oid] = obj.matched_regions[0].cabin_region.vertices
         self.mutex.release()
 
     def get_callback_interval(self):
-        callback = defaultdict()
-        callback[af.Feature.phones] = self.object_interval
-        return callback
+        return self.callback
 
     def clear_all_dictionaries(self):
         """
         Clears the dictionary values
         """
         self.confidence.clear()
-        self.confidence = defaultdict()
         self.bounding_box.clear()
-        self.bounding_box = defaultdict()
+        self.region.clear()
+        self.regionId.clear()
+        self.regionConfidence.clear()
+        self.regionType.clear()
         self.type.clear()
-        self.type = defaultdict()
