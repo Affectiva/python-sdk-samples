@@ -33,7 +33,7 @@ HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRig
                     'pitch', 'yaw', 'roll', 'joy', 'anger', 'surprise', 'valence', 'fear', 'sadness', 'disgust',
                     'neutral', 'contempt', 'smile',
                     'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure',
-                    'cheek_raise', 'yawn',
+                    'cheek_raise', 'lid_tighten', 'yawn',
                     'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor', 'gaze_region',
                     'gaze_confidence', 'glasses'
                     ]
