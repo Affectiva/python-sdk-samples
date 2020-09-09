@@ -40,6 +40,8 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         emotions = listener_metrics["emotions"][fid]
         gaze_metric = listener_metrics["gaze_metric"][fid]
         glasses = listener_metrics["glasses"][fid]
+        if "drowsiness" in listener_metrics:
+            drowsiness_metric = listener_metrics["drowsiness"][fid]
         if "identities" in listener_metrics:
             identity = listener_metrics["identities"][fid]
         upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
@@ -68,8 +70,15 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         display_left_metric("glasses", glasses, upper_left_x, upper_left_y, frame)
         upper_left_y += LINE_HEIGHT
 
+        if "drowsiness" in listener_metrics:
+            display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y)
+            upper_left_y += LINE_HEIGHT
+
+            display_left_metric("drowsiness confidence", drowsiness_metric.confidence, upper_left_x, upper_left_y, frame)
+            upper_left_y += LINE_HEIGHT
+
         for key, val in expressions.items():
-            display_expressions(key.name, val, upper_right_x, upper_right_y, frame)
+            display_expression(key.name, val, upper_right_x, upper_right_y, frame)
             upper_right_y += LINE_HEIGHT
 
 def draw_outlined_text(frame, text, x1, y1):
@@ -371,6 +380,27 @@ def display_gaze(frame, gaze_region_name, upper_left_x, upper_left_y):
     draw_outlined_text(frame, "gaze_region: ", abs(upper_left_x - gaze_text_size - LEFT_METRIC_OFFSET), upper_left_y)
     draw_outlined_text(frame, gaze_region_name, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y)
 
+def display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y):
+    """
+    Display drowsiness metrics on screen to the left of the bounding box
+
+        Parameters
+        ----------
+        frame: numpy array
+            Frame to write the gaze metric on
+        drowsiness_metric: DrowsinessMetric
+            Value of the drowsiness metric
+        upper_left_x: int
+            the upper_left_x co-ordinate of the bounding box
+        upper_left_y: int
+            the upper_left_y co-ordinate of the bounding box
+    """
+
+    key_name = "drowsiness level: "
+    key_text_width, key_text_height = get_text_size(key_name, cv2.FONT_HERSHEY_SIMPLEX, 1)
+    draw_outlined_text(frame, key_name, abs(upper_left_x - key_text_width - LEFT_METRIC_OFFSET), upper_left_y)
+    draw_outlined_text(frame, drowsiness_metric.drowsiness.name, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y)
+
 def display_measurements(key_name, val, upper_left_y, frame, x1):
     """
     Display the measurement metrics on screen.
@@ -437,9 +467,9 @@ def display_left_metric(key_name, val, upper_left_x, upper_left_y, frame):
 
     draw_metric_rects(frame, key_name, val, abs(upper_left_x - total_rect_width), upper_left_y)
 
-def display_expressions(key_name, val, upper_right_x, upper_right_y, frame):
+def display_expression(key_name, val, upper_right_x, upper_right_y, frame):
     """
-    Display the expressions metrics on screen.
+    Display an expression metric on screen, showing the name next to a horizontal segmented bar representing the value
 
         Parameters
         ----------
