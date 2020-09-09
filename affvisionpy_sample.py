@@ -158,6 +158,9 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
     if args.show_identity:
         features.add(af.Feature.identity)
 
+    if args.show_drowsiness:
+        features.add(af.Feature.drowsiness)
+
     detector.enable_features(features)
 
     listener = ImageListener()
@@ -199,6 +202,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 glasses_dict = listener.glasses_dict.copy()
                 if args.show_identity:
                     identities_dict = listener.identities_dict.copy()
+                if args.show_drowsiness:
+                    drowsiness_dict = listener.drowsiness_dict.copy()
 
                 listener.mutex.release()
 
@@ -212,6 +217,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 }
                 if args.show_identity:
                     listener_metrics["identities"] = identities_dict
+                if args.show_drowsiness:
+                    listener_metrics["drowsiness"] = drowsiness_dict
 
                 write_face_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
 
@@ -485,6 +492,11 @@ def write_face_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
                 current_frame_data[key.name] = round(val, 4)
             current_frame_data["confidence"] = round(listener_metrics["bounding_box"][fid][4], 4)
 
+            if "drowsiness" in listener_metrics:
+                drowsiness_metric = listener_metrics["drowsiness"][fid]
+                current_frame_data["drowsinessLevel"] = drowsiness_metric.drowsiness
+                current_frame_data["drowsinessConfidence"] = drowsiness_metric.confidence
+
             if "identities" in listener_metrics:
                 identity = listener_metrics["identities"][fid]
                 current_frame_data["identity"] = identity
@@ -643,6 +655,7 @@ def parse_command_line():
                         help="name of the output CSV file")
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1920, 1080],
                         help="resolution in pixels (2-values): width height")
+    parser.add_argument("--drowsiness", dest="show_drowsiness", action='store_true', help="show face with drowsiness metrics")
     parser.add_argument("--identity", dest="show_identity", action='store_true', help="show face with identity metrics")
     parser.add_argument("--object", dest="show_objects", action='store_true', help="Enable object detection")
     parser.add_argument("--occupant", dest="show_occupants", action='store_true', help="Enable occupant detection")
@@ -733,6 +746,8 @@ def get_command_line_parameters(parser, args):
             # read in the csv file that maps identities to names
             identity_names_dict = read_identities_csv(data)
             header_row.extend(['identity', 'name'])
+        if args.show_drowsiness:
+            header_row.extend(['drowsiness_level', 'drowsiness_confidence'])
     elif args.show_objects:
         header_row = HEADER_ROW_OBJECTS
     elif args.show_occupants:
