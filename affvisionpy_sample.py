@@ -107,7 +107,7 @@ def run(csv_data):
         capture_file.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
         # If cv2 silently fails, default to 1920 x 1080 instead of 640 x 480
         if capture_file.get(3) != frame_width or capture_file.get(4) != frame_height:
-            print(frame_width, "x", frame_height, "is an unsupported resolution, defaulting to 1920 x 1080")
+            print(capture_file.get(3), "x", capture_file.get(4), "is an unsupported resolution, defaulting to 1920 x 1080")
             capture_file.set(cv2.CAP_PROP_FRAME_HEIGHT, DEFAULT_FRAME_HEIGHT)
             capture_file.set(cv2.CAP_PROP_FRAME_WIDTH, DEFAULT_FRAME_WIDTH)
             frame_width = DEFAULT_FRAME_WIDTH
