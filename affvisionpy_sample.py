@@ -494,7 +494,7 @@ def write_face_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
 
             if "drowsiness" in listener_metrics:
                 drowsiness_metric = listener_metrics["drowsiness"][fid]
-                current_frame_data["drowsiness_level"] = drowsiness_metric.drowsiness
+                current_frame_data["drowsiness_level"] = drowsiness_metric.drowsiness.name
                 current_frame_data["drowsiness_confidence"] = drowsiness_metric.confidence
 
             if "identities" in listener_metrics:
