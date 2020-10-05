@@ -137,7 +137,6 @@ def run(csv_data):
 
     capture_file.release()
     cv2.destroyAllWindows()
-    detector.stop()
 
     # If video file is provided as an input
     if not isinstance(input_file, int):
@@ -193,6 +192,7 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                     print(exp)
 
                 listener.mutex.acquire()
+
                 faces = listener.faces.copy()
                 measurements_dict = listener.measurements_dict.copy()
                 expressions_dict = listener.expressions_dict.copy()
@@ -240,6 +240,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                       (last_timestamp, curr_timestamp))
         else:
             break
+
+    detector.stop()
 
 def process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
     count = 0
@@ -320,6 +322,8 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
         else:
             break
 
+    detector.stop()
+
 def process_occupant_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
     count = 0
     last_timestamp = 0
@@ -396,6 +400,8 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
         else:
             break
 
+    detector.stop()
+
 def process_body_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
     count = 0
     last_timestamp = 0
@@ -459,6 +465,8 @@ def process_body_input(detector, capture_file, input_file, start_time, output_fi
                     last_timestamp, curr_timestamp))
         else:
             break
+
+    detector.stop()
 
 def write_face_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
     """
