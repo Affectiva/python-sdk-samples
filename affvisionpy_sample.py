@@ -254,7 +254,6 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
     listener = ObjectListener(OBJECT_CALLBACK_INTERVAL)
     detector.set_object_listener(listener)
 
-    print("Setting up object detection")
     detector.start()
 
     while capture_file.isOpened():
@@ -334,7 +333,6 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
     listener = OccupantListener(OCCUPANT_CALLBACK_INTERVAL)
     detector.set_occupant_listener(listener)
 
-    print("Setting up occupant detection")
     detector.start()
 
     while capture_file.isOpened():
@@ -412,7 +410,6 @@ def process_body_input(detector, capture_file, input_file, start_time, output_fi
     listener = BodyListener(BODY_CALLBACK_INTERVAL)
     detector.set_body_listener(listener)
 
-    print("Setting up body detection")
     detector.start()
 
     while capture_file.isOpened():
@@ -743,7 +740,6 @@ def get_command_line_parameters(parser, args):
         parser.print_help()
         sys.exit(1)
     elif not (is_occupant or is_object or is_body):
-        print("Setting up face detection\n")
         show_faces = True
 
     global header_row
