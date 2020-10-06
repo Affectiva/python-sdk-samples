@@ -137,7 +137,6 @@ def run(csv_data):
 
     capture_file.release()
     cv2.destroyAllWindows()
-    detector.stop()
 
     # If video file is provided as an input
     if not isinstance(input_file, int):
@@ -193,6 +192,7 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                     print(exp)
 
                 listener.mutex.acquire()
+
                 faces = listener.faces.copy()
                 measurements_dict = listener.measurements_dict.copy()
                 expressions_dict = listener.expressions_dict.copy()
@@ -241,6 +241,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
         else:
             break
 
+    detector.stop()
+
 def process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
     count = 0
     last_timestamp = 0
@@ -252,7 +254,6 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
     listener = ObjectListener(OBJECT_CALLBACK_INTERVAL)
     detector.set_object_listener(listener)
 
-    print("Setting up object detection")
     detector.start()
 
     while capture_file.isOpened():
@@ -320,6 +321,8 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
         else:
             break
 
+    detector.stop()
+
 def process_occupant_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
     count = 0
     last_timestamp = 0
@@ -330,7 +333,6 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
     listener = OccupantListener(OCCUPANT_CALLBACK_INTERVAL)
     detector.set_occupant_listener(listener)
 
-    print("Setting up occupant detection")
     detector.start()
 
     while capture_file.isOpened():
@@ -396,6 +398,8 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
         else:
             break
 
+    detector.stop()
+
 def process_body_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
     count = 0
     last_timestamp = 0
@@ -406,7 +410,6 @@ def process_body_input(detector, capture_file, input_file, start_time, output_fi
     listener = BodyListener(BODY_CALLBACK_INTERVAL)
     detector.set_body_listener(listener)
 
-    print("Setting up body detection")
     detector.start()
 
     while capture_file.isOpened():
@@ -459,6 +462,8 @@ def process_body_input(detector, capture_file, input_file, start_time, output_fi
                     last_timestamp, curr_timestamp))
         else:
             break
+
+    detector.stop()
 
 def write_face_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
     """
@@ -735,7 +740,6 @@ def get_command_line_parameters(parser, args):
         parser.print_help()
         sys.exit(1)
     elif not (is_occupant or is_object or is_body):
-        print("Setting up face detection\n")
         show_faces = True
 
     global header_row
