@@ -87,15 +87,15 @@ def run(csv_data):
             Values to hold for each frame
     """
     parser, args = parse_command_line()
-    input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_faces = get_command_line_parameters(
+    input_file, data_dir, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_faces = get_command_line_parameters(
         parser, args)
 
     start_time = 0
     if isinstance(input_file, int):
         start_time = time.time()
-        detector = af.FrameDetector(data, max_num_faces=max_num_of_faces)
+        detector = af.FrameDetector(data_dir, max_num_faces=max_num_of_faces)
     else:
-        detector = af.SyncFrameDetector(data, max_num_of_faces)
+        detector = af.SyncFrameDetector(data_dir, max_num_of_faces)
 
     fps = 30
     if args.video:
@@ -646,7 +646,9 @@ def parse_command_line():
     """
     parser = argparse.ArgumentParser(description="Sample code for demoing affvisionpy module on webcam or a saved video file.\n \
         By default, the program will run with the camera parameter displaying frames of size 1920 x 1080.\n")
-    parser.add_argument("-d", "--data", dest="data", required=False, help="path to directory containing the models. \
+    parser.add_argument("-d", "--data", dest="data_dir", required=False,
+                        help="path to SDK data directory. \
+                        Defaults to the data directory packaged with the affvisionpy module. \
                         Alternatively, specify the path via the environment variable " + DATA_DIR_ENV_VAR + "=/path/to/data/")
     parser.add_argument("-i", "--input", dest="video", required=False,
                         help="path to input video file")
@@ -700,7 +702,7 @@ def get_command_line_parameters(parser, args):
         tuple of str values
             details about input file name, data directory, num of faces to detect, output file name
     """
-    if not args.video is None:
+    if args.video is not None:
         input_file = args.video
         if not os.path.isfile(input_file):
             raise ValueError("Please provide a valid input video file")
@@ -710,16 +712,18 @@ def get_command_line_parameters(parser, args):
         else:
             raise ValueError("Please provide an integer value for camera")
 
-    data = args.data
-    if not data:
-        data = os.environ.get(DATA_DIR_ENV_VAR)
-        if data is None:
-            print("ERROR: Data directory not specified via command line or env var:", DATA_DIR_ENV_VAR, "\n")
-            parser.print_help()
-            sys.exit(1)
-        print("Using value", data, "from env var", DATA_DIR_ENV_VAR)
-    if not os.path.isdir(data):
-        print("ERROR: Please check your data directory path\n")
+    # if a data dir was specified on the command line, use that.  If not, use the value specified via the env var.
+    # if the env var wasn't specified either, use the "data" subfolder under the install location of the module.
+    data_dir = args.data_dir
+    if data_dir is None:
+        data_dir = os.environ.get(DATA_DIR_ENV_VAR)
+        if data_dir is not None:
+            print("Using data dir=\"" + data_dir + "\" from env var", DATA_DIR_ENV_VAR)
+        else:
+            # default to the data dir packaged with the affvisionpy module
+            data_dir = os.path.dirname(af.__file__) + "/data"
+    if not os.path.isdir(data_dir):
+        print("ERROR: data directory \"" + data_dir + "\" does not exist\n")
         parser.print_help()
         sys.exit(1)
 
@@ -748,7 +752,7 @@ def get_command_line_parameters(parser, args):
         if args.show_identity:
             global identity_names_dict
             # read in the csv file that maps identities to names
-            identity_names_dict = read_identities_csv(data)
+            identity_names_dict = read_identities_csv(data_dir)
             header_row.extend(['identity', 'name'])
         if args.show_drowsiness:
             header_row.extend(['drowsiness_level', 'drowsiness_confidence'])
@@ -768,7 +772,7 @@ def get_command_line_parameters(parser, args):
     csv_file = args.file
     frame_width = int(args.res[0])
     frame_height = int(args.res[1])
-    return input_file, data, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_faces
+    return input_file, data_dir, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_faces
 
 if __name__ == "__main__":
     csv_data = list()
