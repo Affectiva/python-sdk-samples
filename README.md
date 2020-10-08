@@ -8,6 +8,11 @@ This script demonstrates how to use Affectiva's affvisionpy module to process fr
 
 2. **cd** into the directory having the requirements.txt file and run **pip3 install -r requirements.txt**
 
+## Setting LD_LIBRARY_PATH
+To use the affvisionpy module, you must set and export the LD_LIBRARY_PATH environment variable to the  "lib" subfolder
+under the affvisionpy installation folder, e.g. 
+        
+        export LD_LIBRARY_PATH=<python root>/lib/<python version>/site-packages/affvisionpy/lib`.
 
 ## Usage ##
 

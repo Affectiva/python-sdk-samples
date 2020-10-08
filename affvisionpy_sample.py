@@ -1,10 +1,20 @@
 # !/usr/bin/env python3
+
 import argparse
 import sys
 import os
 import time
 import csv
 from collections import defaultdict
+
+# Before we import affvisionpy, check to see if LD_LIBRARY_PATH is set to a value that looks appropriate
+# If it's not set, importing affvisionpy will fail, and the error isn't that helpful.
+ld_library_path = os.environ.get("LD_LIBRARY_PATH")
+if (not ld_library_path or not os.path.isfile(ld_library_path + "/libaffectiva-vision.so")):
+    print("You must set and export the LD_LIBRARY_PATH environment variable to the \"lib\" subfolder under the "
+          "affvisionpy installation folder, e.g. <python root>/lib/<python version>/site-packages/affvisionpy/lib")
+    exit(1)
+
 
 import affvisionpy as af
 import cv2
