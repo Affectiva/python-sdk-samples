@@ -5,17 +5,6 @@ import sys
 import os
 import time
 import csv
-from collections import defaultdict
-
-# Before we import affvisionpy, check to see if LD_LIBRARY_PATH is set to a value that looks appropriate
-# If it's not set, importing affvisionpy will fail, and the error isn't that helpful.
-ld_library_path = os.environ.get("LD_LIBRARY_PATH")
-if (not ld_library_path or not os.path.isfile(ld_library_path + "/libaffectiva-vision.so")):
-    print("You must set and export the LD_LIBRARY_PATH environment variable to the \"lib\" subfolder under the "
-          "affvisionpy installation folder, e.g. <python root>/lib/<python version>/site-packages/affvisionpy/lib")
-    exit(1)
-
-
 import affvisionpy as af
 import cv2
 
@@ -55,8 +44,7 @@ HEADER_ROW_OCCUPANTS = ['TimeStamp', 'occupantId', 'bodyId', 'confidence', 'regi
 
 HEADER_ROW_BODIES = ['TimeStamp', 'bodyId']
 header_row = []
-
-identity_names_dict = defaultdict()
+identity_names_dict = {}
 
 
 def get_video_fps(input_file, fps):
@@ -758,6 +746,16 @@ def get_command_line_parameters(parser, args):
 
     global header_row
     if show_faces:
+
+        # If we're processing faces, check to see if LD_LIBRARY_PATH is set to a value that looks appropriate.
+        # If it's not set, enabling the identity or appearances feature on the detector will will fail, and the error
+        # isn't that helpful.
+        ld_library_path = os.environ.get("LD_LIBRARY_PATH")
+        if (not ld_library_path or not os.path.isfile(ld_library_path + "/libaffectiva-vision.so")):
+            print("When enabling face-based features, you must export the LD_LIBRARY_PATH environment variable as shown below:")
+            print("    export LD_LIBRARY_PATH=" + os.path.dirname(os.path.realpath(af.__file__)) + "/lib")
+            exit(1)
+
         header_row = HEADER_ROW_FACES
         if args.show_identity:
             global identity_names_dict
