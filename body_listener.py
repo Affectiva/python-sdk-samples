@@ -47,7 +47,7 @@ class BodyListener(af.BodyListener):
         self.clear_all_dictionaries()
 
         for body_id, body in bodies.items():
-            b_pts = body.body_points
+            b_pts = body.get_body_points()
             body_points = {}
             for b_pt, pt in b_pts.items():
                 body_points[b_pt.name] = [int(pt.x), int(pt.y)]
