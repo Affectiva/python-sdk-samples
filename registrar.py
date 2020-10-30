@@ -94,7 +94,7 @@ class FaceRegistrationStream():
         if ret and (self.frame_count % self.framespan == 0):
             timestamp = self.input_file.get(cv2.CAP_PROP_POS_MSEC)
             afframe = affvisionpy.Frame(self.width, self.height, frame,
-                                        affvisionpy.ColorFormat.bgr,
+                                        affvisionpy.Frame.ColorFormat.bgr,
                                         int(timestamp))
             result = self.face_registrar.register_face(self.identity,
                                                        afframe,

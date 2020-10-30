@@ -44,10 +44,10 @@ class OccupantListener(af.OccupantListener):
         self.clear_all_dictionaries()
         for occid, occ in occupants.items():
             bbox = occ.get_bounding_box()
-            self.bounding_box[occid] = [bbox.getTopLeft().x,
-                                        bbox.getTopLeft().y,
-                                        bbox.getBottomRight().x,
-                                        bbox.getBottomRight().y]
+            self.bounding_box[occid] = [bbox.get_top_left().x,
+                                        bbox.get_top_left().y,
+                                        bbox.get_bottom_right().x,
+                                        bbox.get_bottom_right().y]
             self.regionId[occid] = occ.get_matched_seat().cabin_region.id
             self.regionType[occid] = occ.get_matched_seat().cabin_region.type.name
             if self.regionId[occid] != -1:

@@ -180,7 +180,7 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
             if curr_timestamp > last_timestamp or count == 0:  # if there's a problem with the timestamp, don't process the frame
 
                 last_timestamp = curr_timestamp
-                afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(curr_timestamp))
+                afframe = af.Frame(width, height, frame, af.Frame.ColorFormat.bgr, int(curr_timestamp))
                 count += 1
 
                 try:
@@ -270,7 +270,7 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
             # if there's a problem with the curr_timestamp, don't process the frame
             if curr_timestamp > last_timestamp or count == 0:
                 last_timestamp = curr_timestamp
-                afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(curr_timestamp))
+                afframe = af.Frame(width, height, frame, af.Frame.ColorFormat.bgr, int(curr_timestamp))
                 count += 1
 
                 try:
@@ -348,7 +348,7 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
             # if there's a problem with the curr_timestamp, don't process the frame
             if curr_timestamp > last_timestamp or count == 0:
                 last_timestamp = curr_timestamp
-                afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(curr_timestamp))
+                afframe = af.Frame(width, height, frame, af.Frame.ColorFormat.bgr, int(curr_timestamp))
                 count += 1
 
                 try:
@@ -425,7 +425,7 @@ def process_body_input(detector, capture_file, input_file, start_time, output_fi
             # if there's a problem with the curr_timestamp, don't process the frame
             if curr_timestamp > last_timestamp or count == 0:
                 last_timestamp = curr_timestamp
-                afframe = af.Frame(width, height, frame, af.ColorFormat.bgr, int(curr_timestamp))
+                afframe = af.Frame(width, height, frame, af.Frame.ColorFormat.bgr, int(curr_timestamp))
                 count += 1
 
                 try:
