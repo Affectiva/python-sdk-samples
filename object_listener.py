@@ -49,7 +49,7 @@ class ObjectListener(af.ObjectListener):
                                       bbox.get_top_left().y,
                                       bbox.get_bottom_right().x,
                                       bbox.get_bottom_right().y]
-            self.get_type()[oid] = obj.get_type()
+            self.type[oid] = obj.get_type()
             self.confidence[oid] = obj.get_confidence()
             self.regionId[oid] = obj.get_matched_regions()[0].cabin_region.id
             self.regionConfidence[oid] = obj.get_matched_regions()[0].match_confidence

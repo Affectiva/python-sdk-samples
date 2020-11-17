@@ -27,6 +27,7 @@ class BodyListener(af.BodyListener):
         self.body_interval = body_interval
         self.mutex = Lock()
         self.bodyPoints = defaultdict()
+        self.bodies = defaultdict()
 
 
     def results_updated(self, bodies, frame):
