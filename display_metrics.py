@@ -40,6 +40,8 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         emotions = listener_metrics["emotions"][fid]
         gaze_metric = listener_metrics["gaze_metric"][fid]
         glasses = listener_metrics["glasses"][fid]
+        age_metric = listener_metrics["age_metric"][fid]
+        age_category = listener_metrics["age_category"][fid]
         if "drowsiness" in listener_metrics:
             drowsiness_metric = listener_metrics["drowsiness"][fid]
         if "identities" in listener_metrics:
@@ -80,6 +82,26 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         for key, val in expressions.items():
             display_expression(key.name, val, upper_right_x, upper_right_y, frame)
             upper_right_y += LINE_HEIGHT
+
+        draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y)
+
+def draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y):
+    age = round(age_metric.age)
+    age = 'unknown' if age == -1 else age
+    age_confidence = age_metric.confidence
+    age_confidence = 0 if math.isnan(age_confidence) else round(age_confidence)
+
+    draw_outlined_text(frame, str(age), upper_right_x + 10, upper_right_y)
+    draw_outlined_text(frame, " :age", upper_right_x + LEFT_METRIC_OFFSET, upper_right_y)
+    upper_right_y += LINE_HEIGHT
+
+    draw_metric_rects(frame, "age_confidence", age_confidence, upper_right_x + 10, upper_right_y)
+    draw_outlined_text(frame, " :age_confidence", upper_right_x + LEFT_METRIC_OFFSET, upper_right_y)
+    upper_right_y += LINE_HEIGHT
+
+    draw_outlined_text(frame, age_category, upper_right_x + 10, upper_right_y)
+    draw_outlined_text(frame, " :age_category", upper_right_x + LEFT_METRIC_OFFSET, upper_right_y)
+    upper_right_y += LINE_HEIGHT
 
 def draw_outlined_text(frame, text, x1, y1):
     """
@@ -189,7 +211,6 @@ def draw_objects(frame, listener_metrics):
             region_id = str(listener_metrics["region_id"][oid])
             display_top_metrics("region_id " + region_id, region_type, upper_left_x, upper_left_y, frame)
             upper_left_y -= LINE_HEIGHT
-
 
 def draw_occupants(frame, listener_metrics):
     """
@@ -428,13 +449,8 @@ def display_measurements(key_name, val, upper_left_y, frame, x1):
     max_val_text_width = 83
     key_val_width = key_text_width + max_val_text_width
 
-    cv2.putText(frame, key_name + ": ", (abs(x1 - key_val_width - PADDING_FOR_SEPARATOR), upper_left_y),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                TEXT_SIZE,
-                (255, 255, 255))
-    cv2.putText(frame, val_text, (abs(x1 - val_text_width), upper_left_y),
-                cv2.FONT_HERSHEY_SIMPLEX, TEXT_SIZE,
-                (255, 255, 255))
+    draw_outlined_text(frame, key_name + ": ", abs(x1 - key_val_width - PADDING_FOR_SEPARATOR), upper_left_y)
+    draw_outlined_text(frame, val_text, abs(x1 - val_text_width), upper_left_y)
 
 def display_left_metric(key_name, val, upper_left_x, upper_left_y, frame):
     """

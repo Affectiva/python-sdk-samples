@@ -27,6 +27,8 @@ class FaceListener(af.ImageListener):
         self.identities_dict = defaultdict()
         self.gaze_metric_dict = defaultdict()
         self.glasses_dict = defaultdict()
+        self.age_metric_dict = defaultdict()
+        self.age_category_dict = defaultdict()
  
     def results_updated(self, faces, image):
         timestamp = image.timestamp()
@@ -62,6 +64,8 @@ class FaceListener(af.ImageListener):
             self.identities_dict[fid] = face.get_identity().identity
             self.gaze_metric_dict[fid] = face.get_gaze()
             self.glasses_dict[fid] = face.get_glasses()
+            self.age_metric_dict[fid] = face.get_age()
+            self.age_category_dict[fid] = face.get_age_category().name
             
         self.mutex.release()
     
@@ -84,3 +88,5 @@ class FaceListener(af.ImageListener):
         self.identities_dict.clear()
         self.gaze_metric_dict.clear()
         self.glasses_dict.clear()
+        self.age_metric_dict.clear()
+        self.age_category_dict.clear()
