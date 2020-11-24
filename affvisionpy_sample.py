@@ -7,6 +7,7 @@ import time
 import csv
 import affvisionpy as af
 import cv2
+import math
 
 from body_listener import BODY_POINTS
 from face_listener import FaceListener as ImageListener
@@ -34,7 +35,7 @@ HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRig
                     'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure',
                     'cheek_raise', 'lid_tighten', 'yawn',
                     'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor', 'gaze_region',
-                    'gaze_confidence', 'glasses'
+                    'gaze_confidence', 'glasses', 'age', 'age_confidence', 'age_category'
                     ]
 
 HEADER_ROW_OBJECTS = ['TimeStamp', 'objectId', 'confidence', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY',
@@ -45,7 +46,6 @@ HEADER_ROW_OCCUPANTS = ['TimeStamp', 'occupantId', 'bodyId', 'confidence', 'regi
 HEADER_ROW_BODIES = ['TimeStamp', 'bodyId']
 header_row = []
 identity_names_dict = {}
-
 
 def get_video_fps(input_file, fps):
     """
@@ -198,6 +198,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 bounding_box_dict = listener.bounding_box_dict.copy()
                 gaze_metric_dict = listener.gaze_metric_dict.copy()
                 glasses_dict = listener.glasses_dict.copy()
+                age_metric_dict = listener.age_metric_dict.copy()
+                age_category_dict = listener.age_category_dict.copy()
                 if args.show_identity:
                     identities_dict = listener.identities_dict.copy()
                 if args.show_drowsiness:
@@ -211,7 +213,9 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                     "emotions": emotions_dict,
                     "bounding_box": bounding_box_dict,
                     "gaze_metric": gaze_metric_dict,
-                    "glasses": glasses_dict
+                    "glasses": glasses_dict,
+                    "age_metric": age_metric_dict,
+                    "age_category": age_category_dict
                 }
                 if args.show_identity:
                     listener_metrics["identities"] = identities_dict
@@ -375,7 +379,7 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
                     "region": region_dict,
                     "region_type": region_type_dict,
                     "body_id": body_id_dict,
-                    "body_points":  body_points_dict
+                    "body_points": body_points_dict
                 }
 
                 write_occupant_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
@@ -511,7 +515,13 @@ def write_face_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
             current_frame_data["gaze_region"] = listener_metrics["gaze_metric"][fid].gaze_region.name
             current_frame_data["gaze_confidence"] = str(listener_metrics["gaze_metric"][fid].confidence)
             current_frame_data["glasses"] = round(listener_metrics["glasses"][fid])
+            age = round(listener_metrics["age_metric"][fid].age)
+            current_frame_data["age"] = 'unknown' if age == -1 else age
+            age_confidence = listener_metrics["age_metric"][fid].confidence
+            current_frame_data["age_confidence"] = 0 if math.isnan(age_confidence) else round(age_confidence)
+            current_frame_data["age_category"] = listener_metrics["age_category"][fid]
             csv_data.append(current_frame_data)
+            current_frame_data = {}
 
 def write_object_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
     """
@@ -538,6 +548,7 @@ def write_object_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics)
             current_frame_data["confidence"] = round(listener_metrics["confidence"][obj_id])
             current_frame_data["ObjectType"] = listener_metrics["object_type"][obj_id].name
             csv_data.append(current_frame_data)
+            current_frame_data = {}
     else:
         write_default_csv_data(current_frame_data, timestamp)
 
@@ -568,6 +579,7 @@ def write_occupant_metrics_to_csv_data_list(csv_data, timestamp, listener_metric
             current_frame_data["regionType"] = listener_metrics["region_type"][occ_id]
             current_frame_data["bodyId"] = listener_metrics["body_id"][occ_id]
             csv_data.append(current_frame_data)
+            current_frame_data = {}
     else:
         write_default_csv_data(current_frame_data, timestamp)
 
@@ -595,6 +607,7 @@ def write_body_metrics_to_csv_data_list(csv_data, timestamp, listener_metrics):
                 current_frame_data[b_pt + "_x"] = pt[0]
                 current_frame_data[b_pt + "_y"] = pt[1]
             csv_data.append(current_frame_data)
+            current_frame_data = {}
     else:
         write_default_csv_data(current_frame_data, timestamp)
 
