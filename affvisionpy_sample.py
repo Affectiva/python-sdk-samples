@@ -45,7 +45,7 @@ HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRig
 HEADER_ROW_OBJECTS = ['TimeStamp', 'objectId', 'confidence', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY',
                       'ObjectType']
 
-HEADER_ROW_OCCUPANTS = ['TimeStamp', 'occupantId', 'bodyId', 'confidence', 'regionId', 'regionType', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY']
+HEADER_ROW_OCCUPANTS = ['TimeStamp', 'occupantId', 'bodyId', 'faceId',  'confidence', 'regionId', 'regionType', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY']
 
 HEADER_ROW_BODIES = ['TimeStamp', 'bodyId']
 header_row = []
@@ -129,15 +129,17 @@ def run(csv_data):
 
     logo = get_affectiva_logo(file_width, file_height)
 
-    if show_faces:
+    if args.show_emo_exp_c:
         process_face_input(detector, capture_file, input_file, start_time, output_file, out, logo, args,
                            camera_matrix, dist_coefficients, camera_type)
-    elif args.show_objects:
+    elif args.show_object_c:
         process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
-    elif args.show_occupants:
-        process_occupant_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
-    elif args.show_bodies:
-        process_body_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+    elif args.show_occupants_c:
+        process_occupant_bkp_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+    elif args.show_gaze_c:
+        process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+    # elif args.show_drowsiness_c:
+    #     process_drowsiness_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
 
     capture_file.release()
     cv2.destroyAllWindows()
@@ -158,12 +160,7 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
     count = 0
     last_timestamp = 0
 
-    features = {af.Feature.expressions, af.Feature.emotions, af.Feature.gaze, af.Feature.appearances}
-    if args.show_identity:
-        features.add(af.Feature.identity)
-
-    if args.show_drowsiness:
-        features.add(af.Feature.drowsiness)
+    features = {af.Feature.expressions, af.Feature.emotions}
 
     detector.enable_features(features)
 
@@ -176,7 +173,7 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
         # Capture frame-by-frame
         ret, frame = capture_file.read()
 
-        if ret == True:
+        if ret:
 
             height = frame.shape[0]
             width = frame.shape[1]
@@ -199,43 +196,31 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 listener.mutex.acquire()
 
                 faces = listener.faces.copy()
-                measurements_dict = listener.measurements_dict.copy()
+                # measurements_dict = listener.measurements_dict.copy()
                 expressions_dict = listener.expressions_dict.copy()
                 emotions_dict = listener.emotions_dict.copy()
                 bounding_box_dict = listener.bounding_box_dict.copy()
-                gaze_metric_dict = listener.gaze_metric_dict.copy()
-                glasses_dict = listener.glasses_dict.copy()
-                age_metric_dict = listener.age_metric_dict.copy()
-                age_category_dict = listener.age_category_dict.copy()
+                # gaze_metric_dict = listener.gaze_metric_dict.copy()
+                # glasses_dict = listener.glasses_dict.copy()
+                # age_metric_dict = listener.age_metric_dict.copy()
+                # age_category_dict = listener.age_category_dict.copy()
                 face_landmark_points_dict = listener.face_landmark_points_dict.copy()
-                if args.show_identity:
-                    identities_dict = listener.identities_dict.copy()
-                if args.show_drowsiness:
-                    drowsiness_dict = listener.drowsiness_dict.copy()
+
 
                 listener.mutex.release()
 
                 listener_metrics = {
-                    "measurements": measurements_dict,
                     "expressions": expressions_dict,
                     "emotions": emotions_dict,
                     "bounding_box": bounding_box_dict,
-                    "gaze_metric": gaze_metric_dict,
-                    "glasses": glasses_dict,
-                    "age_metric": age_metric_dict,
-                    "age_category": age_category_dict,
                     "face_landmark_pts": face_landmark_points_dict
                 }
-                if args.show_identity:
-                    listener_metrics["identities"] = identities_dict
-                if args.show_drowsiness:
-                    listener_metrics["drowsiness"] = drowsiness_dict
 
-                write_face_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
+                # write_face_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
 
                 draw_affectiva_logo(frame, logo, width, height)
                 if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
-                    draw_bounding_box(frame, listener_metrics)
+                    draw_bounding_box(frame, listener_metrics, True)
                     draw_and_calculate_3d_pose(frame, camera_matrix, camera_type, dist_coefficients, listener_metrics)
                     draw_metrics(frame, listener_metrics, identity_names_dict)
 
@@ -255,16 +240,174 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
 
     detector.stop()
 
+def process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
+    # TODO: this is just a base structure to get started @lindsay
+    count = 0
+    last_timestamp = 0
+
+    features = {af.Feature.measurements, af.Feature.gaze}
+
+    detector.enable_features(features)
+
+    listener = ImageListener()
+    detector.set_image_listener(listener)
+
+    detector.start()
+
+    while capture_file.isOpened():
+        # Capture frame-by-frame
+        ret, frame = capture_file.read()
+
+        if ret:
+
+            height = frame.shape[0]
+            width = frame.shape[1]
+            if isinstance(input_file, int):
+                curr_timestamp = (time.time() - start_time) * 1000.0
+            else:
+                curr_timestamp = int(capture_file.get(cv2.CAP_PROP_POS_MSEC))
+            if curr_timestamp > last_timestamp or count == 0:  # if there's a problem with the timestamp, don't process the frame
+
+                last_timestamp = curr_timestamp
+                afframe = af.Frame(width, height, frame, af.Frame.ColorFormat.bgr, int(curr_timestamp))
+                count += 1
+
+                try:
+                    detector.process(afframe)
+
+                except Exception as exp:
+                    print(exp)
+
+                listener.mutex.acquire()
+
+                faces = listener.faces.copy()
+                # measurements_dict = listener.measurements_dict.copy()
+                bounding_box_dict = listener.bounding_box_dict.copy()
+                # gaze_metric_dict = listener.gaze_metric_dict.copy()
+                # glasses_dict = listener.glasses_dict.copy()
+                # age_metric_dict = listener.age_metric_dict.copy()
+                # age_category_dict = listener.age_category_dict.copy()
+
+                listener.mutex.release()
+
+                listener_metrics = {
+                    "bounding_box": bounding_box_dict
+                }
+
+                draw_affectiva_logo(frame, logo, width, height)
+                if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
+                    draw_bounding_box(frame, listener_metrics, True)
+                    draw_metrics(frame, listener_metrics, identity_names_dict)
+
+                if not args.no_draw:
+                    cv2.imshow('Processed Frame', frame)
+
+                if output_file is not None:
+                    out.write(frame)
+
+                if cv2.waitKey(1) == 27:
+                    break
+            else:
+                print("skipped a frame due to the timestamp not incrementing - old timestamp %f, current timestamp %f" %
+                      (last_timestamp, curr_timestamp))
+        else:
+            break
+
+    detector.stop()
+
+def process_occupant_bkp_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
+    count = 0
+    last_timestamp = 0
+
+    features = {af.Feature.faces, af.Feature.bodies}
+
+    detector.enable_features(features)
+
+    face_listener = ImageListener()
+    detector.set_image_listener(face_listener)
+
+    # callback interval for body
+    body_listener = BodyListener(BODY_CALLBACK_INTERVAL)
+    detector.set_body_listener(body_listener)
+
+    detector.start()
+
+    while capture_file.isOpened():
+        # Capture frame-by-frame
+        ret, frame = capture_file.read()
+
+        if ret:
+
+            height = frame.shape[0]
+            width = frame.shape[1]
+            if isinstance(input_file, int):
+                curr_timestamp = (time.time() - start_time) * 1000.0
+            else:
+                curr_timestamp = int(capture_file.get(cv2.CAP_PROP_POS_MSEC))
+            if curr_timestamp > last_timestamp or count == 0:  # if there's a problem with the timestamp, don't process the frame
+
+                last_timestamp = curr_timestamp
+                afframe = af.Frame(width, height, frame, af.Frame.ColorFormat.bgr, int(curr_timestamp))
+                count += 1
+
+                try:
+                    detector.process(afframe)
+
+                except Exception as exp:
+                    print(exp)
+
+                face_listener.mutex.acquire()
+                faces = face_listener.faces.copy()
+                bounding_box_dict = face_listener.bounding_box_dict.copy()
+                face_listener.mutex.release()
+
+                body_listener.mutex.acquire()
+                bodies = body_listener.bodies.copy()
+                body_points_dict = body_listener.bodyPoints.copy()
+                body_listener.mutex.release()
+
+                listener_metrics = {
+                    "bounding_box": bounding_box_dict,
+                    "body_points": body_points_dict
+                }
+
+                draw_affectiva_logo(frame, logo, width, height)
+                if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
+                    draw_bounding_box(frame, listener_metrics, False)
+
+                if len(bodies) > 0:
+                    draw_bodies(frame, listener_metrics)
+
+                if not args.no_draw:
+                    cv2.imshow('Processed Frame', frame)
+
+                if output_file is not None:
+                    out.write(frame)
+
+                if cv2.waitKey(1) == 27:
+                    break
+            else:
+                print("skipped a frame due to the timestamp not incrementing - old timestamp %f, current timestamp %f" %
+                      (last_timestamp, curr_timestamp))
+        else:
+            break
+
+    detector.stop()
+
+
 def process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
     count = 0
     last_timestamp = 0
 
-    # only enabling phones for now, TODO: add child seat later
-    detector.enable_features({af.Feature.phones, af.Feature.child_seats})
+    detector.enable_features({af.Feature.phones, af.Feature.child_seats, af.Feature.bodies})
 
     # callback interval
-    listener = ObjectListener(OBJECT_CALLBACK_INTERVAL)
-    detector.set_object_listener(listener)
+    object_listener = ObjectListener(OBJECT_CALLBACK_INTERVAL)
+    detector.set_object_listener(object_listener)
+
+    # callback interval for body
+    body_listener = BodyListener(BODY_CALLBACK_INTERVAL)
+    detector.set_body_listener(body_listener)
 
     detector.start()
 
@@ -293,30 +436,28 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
                 except Exception as exp:
                     print(exp)
 
-                listener.mutex.acquire()
-                objects = listener.objects.copy()
-                bounding_box_dict = listener.bounding_box.copy()
-                confidence_dict = listener.confidence.copy()
-                type_dict = listener.type.copy()
-                region_dict = listener.region.copy()
-                region_id_dict = listener.regionId.copy()
-                region_confidence_dict = listener.regionConfidence.copy()
-                region_type_dict = listener.regionType.copy()
-                listener.mutex.release()
+                object_listener.mutex.acquire()
+                objects = object_listener.objects.copy()
+                bounding_box_dict = object_listener.bounding_box.copy()
+                type_dict = object_listener.type.copy()
+                object_listener.mutex.release()
+
+                body_listener.mutex.acquire()
+                bodies = body_listener.bodies.copy()
+                body_points_dict = body_listener.bodyPoints.copy()
+                body_listener.mutex.release()
 
                 listener_metrics = {
                     "bounding_box": bounding_box_dict,
-                    "confidence": confidence_dict,
                     "object_type": type_dict,
-                    "region": region_dict,
-                    "region_id": region_id_dict,
-                    "region_confidence": region_confidence_dict,
-                    "region_type": region_type_dict
+                    "body_points": body_points_dict
                 }
 
-                write_object_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
                 if len(objects) > 0 and not check_bounding_box_outside(width, height, listener_metrics["bounding_box"]):
                     draw_objects(frame, listener_metrics)
+
+                if len(bodies) > 0:
+                    draw_bodies(frame, listener_metrics)
 
                 draw_affectiva_logo(frame, logo, width, height)
                 if not args.no_draw:
@@ -380,6 +521,7 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
                 region_type_dict = listener.regionType.copy()
                 body_id_dict = listener.bodyId.copy()
                 body_points_dict = listener.bodyPoints.copy()
+                face_id_dict = listener.faceId.copy()
                 listener.mutex.release()
 
                 listener_metrics = {
@@ -389,7 +531,8 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
                     "region": region_dict,
                     "region_type": region_type_dict,
                     "body_id": body_id_dict,
-                    "body_points": body_points_dict
+                    "body_points": body_points_dict,
+                    "face_id": face_id_dict
                 }
 
                 write_occupant_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
@@ -588,6 +731,7 @@ def write_occupant_metrics_to_csv_data_list(csv_data, timestamp, listener_metric
             current_frame_data["regionId"] = listener_metrics["region_id"][occ_id]
             current_frame_data["regionType"] = listener_metrics["region_type"][occ_id]
             current_frame_data["bodyId"] = listener_metrics["body_id"][occ_id]
+            current_frame_data["faceId"] = listener_metrics["face_id"][occ_id]
             csv_data.append(current_frame_data)
             current_frame_data = {}
     else:
@@ -689,6 +833,11 @@ def parse_command_line():
     parser.add_argument("--occupant", dest="show_occupants", action='store_true', help="Enable occupant detection")
     parser.add_argument("--body", dest="show_bodies", action='store_true', help="Enable body points detection")
     parser.add_argument("--no-draw", dest="no_draw", action='store_true', help="Don't draw window while processing video, default is set to False")
+    parser.add_argument("--c_drowsiness", dest="show_drowsiness_c", action='store_true', help="Enable special drowsiness detection")
+    parser.add_argument("--c_gaze", dest="show_gaze_c", action='store_true', help="Enable special gaze detection")
+    parser.add_argument("--c_occupant", dest="show_occupants_c", action='store_true', help="Enable special occupant detection")
+    parser.add_argument("--c_object", dest="show_object_c", action='store_true', help="Enable special object detection")
+    parser.add_argument("--c_emo_exp", dest="show_emo_exp_c", action='store_true', help="Enable special emotion and expression detection")
     default_estimate_3d_pose_text = "Enable this flag to view 3d pose estimation with the default \
             camera matrix. For 1920x1080 resolution, this is: [[1920,0,960],[0,1920,540],[0,0,1]]"
     parser.add_argument("--default_estimate_3d_pose", default=False, action="store_true",
@@ -708,6 +857,7 @@ def parse_command_line():
                         help="Provide distortion coefficients from camera calibration process. \
                                   For fisheye cameras, input a 4x1 numpy array as a string: default='[[0],[0],[0],[0]]'. \
                                   For pinhole cameras, input a 5x1 numpy array as a string: default='[[0],[0],[0],[0],[0]]'.")
+
     args = parser.parse_args()
     return parser, args
 
@@ -769,55 +919,11 @@ def get_command_line_parameters(parser, args):
 
     show_faces = False
 
-    is_occupant = args.show_occupants
-    is_object = args.show_objects
-    is_body = args.show_bodies
-    is_identity = args.show_identity
-    is_all = is_occupant and is_object and is_body and is_identity
-
-    if is_all:
-        print("ERROR: Can't enable all features at same time\n")
-        parser.print_help()
-        sys.exit(1)
-    elif (is_identity and (is_body or is_occupant or is_object)) or (is_body and (is_identity or is_occupant or is_object)) or (is_occupant and (is_body or is_identity or is_object)) or (is_object and (is_body or is_occupant or is_identity)):
-        print("ERROR: Can't enable multiple feature at the same time\n")
-        parser.print_help()
-        sys.exit(1)
-    elif not (is_occupant or is_object or is_body):
-        show_faces = True
-
-    global header_row
-    if show_faces:
-
-        # If we're processing faces, check to see if LD_LIBRARY_PATH is set to a value that looks appropriate.
-        # If it's not set, enabling the identity or appearances feature on the detector will will fail, and the error
-        # isn't that helpful.
-        ld_library_path = os.environ.get("LD_LIBRARY_PATH")
-        if (not ld_library_path or not os.path.isfile(ld_library_path + "/libaffectiva-vision.so")):
-            print("When enabling face-based features, you must export the LD_LIBRARY_PATH environment variable as shown below:")
-            print("    export LD_LIBRARY_PATH=" + os.path.dirname(os.path.realpath(af.__file__)) + "/lib")
-            exit(1)
-
-        header_row = HEADER_ROW_FACES
-        if args.show_identity:
-            global identity_names_dict
-            # read in the csv file that maps identities to names
-            identity_names_dict = read_identities_csv(data_dir)
-            header_row.extend(['identity', 'name'])
-        if args.show_drowsiness:
-            header_row.extend(['drowsiness_level', 'drowsiness_confidence'])
-    elif args.show_objects:
-        header_row = HEADER_ROW_OBJECTS
-    elif args.show_occupants:
-        header_row = HEADER_ROW_OCCUPANTS
-    elif args.show_bodies:
-        header_row = HEADER_ROW_BODIES
-        head_temp = []
-        for point in BODY_POINTS:
-            head_temp.extend([point + "_x", point + "_y"])
-        header_row.extend(head_temp)
-
     max_num_of_faces = int(args.num_faces)
+
+    if args.show_gaze_c or args.show_drowsiness_c:
+        max_num_of_faces = 1
+
     output_file = args.output
     csv_file = args.file
     frame_width = int(args.res[0])

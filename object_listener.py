@@ -16,12 +16,7 @@ class ObjectListener(af.ObjectListener):
         self.process_last_ts = 0.0
         self.mutex = Lock()
         self.objects = defaultdict()
-        self.confidence = defaultdict()
         self.bounding_box = defaultdict()
-        self.region = defaultdict()
-        self.regionId = defaultdict()
-        self.regionConfidence = defaultdict()
-        self.regionType = defaultdict()
         self.type = defaultdict()
         self.callback = defaultdict()
         self.callback[af.Feature.phones] = object_interval
@@ -50,12 +45,7 @@ class ObjectListener(af.ObjectListener):
                                       bbox.get_bottom_right().x,
                                       bbox.get_bottom_right().y]
             self.type[oid] = obj.get_type()
-            self.confidence[oid] = obj.get_confidence()
-            self.regionId[oid] = obj.get_matched_regions()[0].cabin_region.id
-            self.regionConfidence[oid] = obj.get_matched_regions()[0].match_confidence
-            self.regionType[oid] = obj.get_matched_regions()[0].cabin_region.type.name
-            if self.regionId[oid] != -1:
-                self.region[oid] = obj.get_matched_regions()[0].cabin_region.vertices
+
         self.mutex.release()
 
     def get_callback_interval(self):
@@ -65,10 +55,5 @@ class ObjectListener(af.ObjectListener):
         """
         Clears the dictionary values
         """
-        self.confidence.clear()
         self.bounding_box.clear()
-        self.region.clear()
-        self.regionId.clear()
-        self.regionConfidence.clear()
-        self.regionType.clear()
         self.type.clear()

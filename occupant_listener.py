@@ -25,6 +25,8 @@ class OccupantListener(af.OccupantListener):
         self.regionType = defaultdict()
         self.bodyId = defaultdict()
         self.bodyPoints = defaultdict()
+        self.faceId = defaultdict()
+
 
     def results_updated(self, occupants, frame):
         timestamp = frame.timestamp()
@@ -52,17 +54,21 @@ class OccupantListener(af.OccupantListener):
             self.regionType[occid] = occ.get_matched_seat().cabin_region.type.name
             if self.regionId[occid] != -1:
                 self.region[occid] = occ.get_matched_seat().cabin_region.vertices
-            # TODO: research the bug where we are not able to access object directly and gives "munmap_chunk(): invalid pointer"
-            # body_occ = occ.get_body()
-            # if body_occ is not None:
-            #     self.bodyId[occid] = body_occ.get_body_id()
-            #     b_pts = body_occ.get_body_points()
-            #     body_points = {}
-            #     for b_pt, pt in b_pts.items():
-            #         body_points[b_pt.name] = [int(pt.x), int(pt.y)]
-            #     self.bodyPoints[occid] = body_points
-            # else:
-            self.bodyId[occid] = "nan"
+            body_occ = occ.get_body()
+            if body_occ is not None:
+                self.bodyId[occid] = body_occ.get_id()
+                b_pts = body_occ.get_body_points()
+                body_points = {}
+                for b_pt, pt in b_pts.items():
+                    body_points[b_pt.name] = [int(pt.x), int(pt.y)]
+                self.bodyPoints[occid] = body_points
+            else:
+                self.bodyId[occid] = "nan"
+            face_occ = occ.get_face()
+            if face_occ is not None:
+                self.faceId[occid] = face_occ.get_id()
+            else:
+                self.faceId[occid] = "nan"
             self.confidence[occid] = occ.get_matched_seat().match_confidence
         self.mutex.release()
 
@@ -80,3 +86,4 @@ class OccupantListener(af.OccupantListener):
         self.regionType.clear()
         self.bodyId.clear()
         self.bodyPoints.clear()
+        self.faceId.clear()

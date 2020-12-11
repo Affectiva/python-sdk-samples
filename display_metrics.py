@@ -31,61 +31,51 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
 
     """
     # draw gaze region for the first face. (ideally we should draw it for the driver only)
-    gaze_metrics = listener_metrics["gaze_metric"]
-    if len(gaze_metrics):
-        metric = next(iter(gaze_metrics.values()))
-        draw_gaze_region(frame, metric)
+    # gaze_metrics = listener_metrics["gaze_metric"]
+    # if len(gaze_metrics):
+    #     metric = next(iter(gaze_metrics.values()))
+    #     draw_gaze_region(frame, metric)
 
-    for fid in listener_metrics["measurements"].keys():
-        measurements = listener_metrics["measurements"][fid]
+    for fid in listener_metrics["expressions"].keys():
         expressions = listener_metrics["expressions"][fid]
         emotions = listener_metrics["emotions"][fid]
-        gaze_metric = listener_metrics["gaze_metric"][fid]
-        glasses = listener_metrics["glasses"][fid]
-        age_metric = listener_metrics["age_metric"][fid]
-        age_category = listener_metrics["age_category"][fid]
-        if "drowsiness" in listener_metrics:
-            drowsiness_metric = listener_metrics["drowsiness"][fid]
-        if "identities" in listener_metrics:
-            identity = listener_metrics["identities"][fid]
         upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
 
         box_width = lower_right_x - upper_left_x
         upper_right_x = upper_left_x + box_width
         upper_right_y = upper_left_y
 
-        if "identities" in listener_metrics:
-            display_identity(frame, identity, upper_left_y, upper_left_x, identity_names_dict)
-
-        for key, val in measurements.items():
-            display_measurements(key.name, val, upper_left_y, frame, upper_left_x)
-            upper_left_y += LINE_HEIGHT
+        # can be used to show yaw pitch roll
+        # for key, val in measurements.items():
+        #     display_measurements(key.name, val, upper_left_y, frame, upper_left_x)
+        #     upper_left_y += LINE_HEIGHT
 
         for key, val in emotions.items():
-            display_left_metric(key.name, val, upper_left_x, upper_left_y, frame)
-            upper_left_y += LINE_HEIGHT
+            if key.name == 'joy' or key.name == 'anger' or key.name == 'surprise' or key.name == 'neutral':
+                display_left_metric(key.name, val, upper_left_x, upper_left_y, frame)
+                upper_left_y += LINE_HEIGHT
 
-        display_gaze(frame, gaze_metric.gaze_region.name, upper_left_x, upper_left_y)
-        upper_left_y += LINE_HEIGHT
-
-        display_left_metric("gaze_confidence", gaze_metric.confidence, upper_left_x, upper_left_y, frame)
-        upper_left_y += LINE_HEIGHT
-
-        display_left_metric("glasses", glasses, upper_left_x, upper_left_y, frame)
-        upper_left_y += LINE_HEIGHT
-
-        if "drowsiness" in listener_metrics:
-            display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y)
-            upper_left_y += LINE_HEIGHT
-
-            display_left_metric("drowsiness confidence", drowsiness_metric.confidence, upper_left_x, upper_left_y, frame)
-            upper_left_y += LINE_HEIGHT
+        # display_gaze(frame, gaze_metric.gaze_region.name, upper_left_x, upper_left_y)
+        # upper_left_y += LINE_HEIGHT
+        #
+        # display_left_metric("gaze_confidence", gaze_metric.confidence, upper_left_x, upper_left_y, frame)
+        # upper_left_y += LINE_HEIGHT
+        #
+        # display_left_metric("glasses", glasses, upper_left_x, upper_left_y, frame)
+        # upper_left_y += LINE_HEIGHT
+        #
+        # if "drowsiness" in listener_metrics:
+        #     display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y)
+        #     upper_left_y += LINE_HEIGHT
+        #
+        #     display_left_metric("drowsiness confidence", drowsiness_metric.confidence, upper_left_x, upper_left_y, frame)
+        #     upper_left_y += LINE_HEIGHT
 
         for key, val in expressions.items():
             display_expression(key.name, val, upper_right_x, upper_right_y, frame)
             upper_right_y += LINE_HEIGHT
 
-        draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y)
+        # draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y)
 
 def draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y):
     age = round(age_metric.age)
@@ -183,9 +173,6 @@ def draw_objects(frame, listener_metrics):
             upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(oid, listener_metrics[
                 "bounding_box"])
 
-            if listener_metrics["region_id"][oid] != -1:
-                draw_polygon(listener_metrics["region"][oid], frame, (255, 255, 255))
-
             obj_type = listener_metrics["object_type"][oid].name
             # default color == GRAY
             color = (128, 128, 128)
@@ -202,16 +189,6 @@ def draw_objects(frame, listener_metrics):
             upper_left_y -= LINE_HEIGHT
 
             display_top_metrics("type", obj_type, upper_left_x, upper_left_y, frame)
-            upper_left_y -= LINE_HEIGHT
-
-            display_top_metrics("object_confidence", listener_metrics["confidence"][oid], upper_left_x, upper_left_y, frame)
-            upper_left_y -= LINE_HEIGHT
-            display_top_metrics("region_confidence", listener_metrics["region_confidence"][oid], upper_left_x, upper_left_y, frame)
-            upper_left_y -= LINE_HEIGHT
-
-            region_type = listener_metrics["region_type"][oid]
-            region_id = str(listener_metrics["region_id"][oid])
-            display_top_metrics("region_id " + region_id, region_type, upper_left_x, upper_left_y, frame)
             upper_left_y -= LINE_HEIGHT
 
 def draw_occupants(frame, listener_metrics):
@@ -248,6 +225,14 @@ def draw_occupants(frame, listener_metrics):
             display_top_metrics("region_id " + region_id, region_type, upper_left_x, upper_left_y, frame)
             upper_left_y -= LINE_HEIGHT
             display_top_metrics("occupant_id", occid, upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+            face_id = listener_metrics["face_id"][occid]
+            face_id = 'n/a' if face_id == 'nan' else face_id
+            display_top_metrics("face_id", face_id, upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+            body_id = listener_metrics["body_id"][occid]
+            body_id = 'n/a' if body_id == 'nan' else body_id
+            display_top_metrics("body_id", body_id, upper_left_x, upper_left_y, frame)
             upper_left_y -= LINE_HEIGHT
             draw_bodies(frame, listener_metrics)
 
@@ -350,7 +335,7 @@ def get_face_landmark_points(fid, face_landmark_points_dict):
     face_landmark_points_dict[fid][af.FacePoint.nose_tip],
     face_landmark_points_dict[fid][af.FacePoint.chin_tip]]
 
-def draw_bounding_box(frame, listener_metrics):
+def draw_bounding_box(frame, listener_metrics, show_emotion):
     """
     For each frame, draw the bounding box on screen.
 
@@ -363,22 +348,27 @@ def draw_bounding_box(frame, listener_metrics):
             dictionary of dictionaries, gives current listener state
 
     """
-    emotion_value_threshold = 5
-    for fid in listener_metrics["bounding_box"].keys():
-        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
-        for key in listener_metrics["emotions"][fid]:
-            if 'valence' in str(key):
-                valence_value = listener_metrics["emotions"][fid][key]
-            if 'anger' in str(key):
-                anger_value = listener_metrics["emotions"][fid][key]
-            if 'joy' in str(key):
-                joy_value = listener_metrics["emotions"][fid][key]
+    if show_emotion:
+        emotion_value_threshold = 5
+        for fid in listener_metrics["bounding_box"].keys():
+            upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
+            for key in listener_metrics["emotions"][fid]:
+                if 'valence' in str(key):
+                    valence_value = listener_metrics["emotions"][fid][key]
+                if 'anger' in str(key):
+                    anger_value = listener_metrics["emotions"][fid][key]
+                if 'joy' in str(key):
+                    joy_value = listener_metrics["emotions"][fid][key]
 
-        if valence_value < 0 and anger_value >= emotion_value_threshold:
-            cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 0, 255), 3)
-        elif valence_value >= emotion_value_threshold and joy_value >= emotion_value_threshold:
-            cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 255, 0), 3)
-        else:
+            if valence_value < 0 and anger_value >= emotion_value_threshold:
+                cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 0, 255), 3)
+            elif valence_value >= emotion_value_threshold and joy_value >= emotion_value_threshold:
+                cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 255, 0), 3)
+            else:
+                cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (21, 169, 167), 3)
+    else:
+        for fid in listener_metrics["bounding_box"].keys():
+            upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (21, 169, 167), 3)
 
 def draw_and_calculate_3d_pose(frame, camera_matrix, camera_type, dist_coefficients, listener_metrics):
