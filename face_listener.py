@@ -22,6 +22,7 @@ class FaceListener(af.ImageListener):
         self.bounding_box_dict = defaultdict()
         self.time_metrics_dict = defaultdict()
         self.faces = defaultdict()
+        self.face_landmark_points_dict = defaultdict()
 
         self.drowsiness_dict = defaultdict()
         self.identities_dict = defaultdict()
@@ -66,6 +67,7 @@ class FaceListener(af.ImageListener):
             self.glasses_dict[fid] = face.get_glasses()
             self.age_metric_dict[fid] = face.get_age()
             self.age_category_dict[fid] = face.get_age_category().name
+            self.face_landmark_points_dict[fid] = face.get_face_points()
             
         self.mutex.release()
     
@@ -90,3 +92,4 @@ class FaceListener(af.ImageListener):
         self.glasses_dict.clear()
         self.age_metric_dict.clear()
         self.age_category_dict.clear()
+        self.face_landmark_points_dict.clear()

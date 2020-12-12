@@ -3,8 +3,10 @@ import cv2
 import os
 import math
 import numpy as np
+import affvisionpy as af
 
 from body_listener import EDGES, COLORS
+from pnp_pose_estimator import estimate_pose_wrapper, get_default_camera_matrix, get_default_distortion_coefficients
 
 TEXT_SIZE = 0.6
 PADDING_FOR_SEPARATOR = 5
@@ -330,6 +332,24 @@ def get_bounding_box_points(fid, bounding_box_dict):
             int(bounding_box_dict[fid][2]),
             int(bounding_box_dict[fid][3]))
 
+def get_face_landmark_points(fid, face_landmark_points_dict):
+    """
+    Fetch landmark points from given dictionary
+
+    Inputs:
+    * fid: int
+        Face ID to get the landmark points for
+
+    Outputs:
+    * landmark_points: Array[float]
+        outer_right_eye, outer_left_eye, nose_tip, chin_tip
+    """
+
+    return [face_landmark_points_dict[fid][af.FacePoint.outer_right_eye],
+    face_landmark_points_dict[fid][af.FacePoint.outer_left_eye],
+    face_landmark_points_dict[fid][af.FacePoint.nose_tip],
+    face_landmark_points_dict[fid][af.FacePoint.chin_tip]]
+
 def draw_bounding_box(frame, listener_metrics):
     """
     For each frame, draw the bounding box on screen.
@@ -360,6 +380,63 @@ def draw_bounding_box(frame, listener_metrics):
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 255, 0), 3)
         else:
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (21, 169, 167), 3)
+
+def draw_and_calculate_3d_pose(frame, camera_matrix, camera_type, dist_coefficients, listener_metrics):
+    """
+    Calculate 3d pose from landmark face points, then draw arrows indicating 3d pose
+    on the given frame.
+
+    """
+    axis_length = 50
+
+    if "face_landmark_pts" in listener_metrics:
+        face_landmark_points_dict = listener_metrics["face_landmark_pts"]
+        for fid in face_landmark_points_dict.keys():
+            landmark_pts = get_face_landmark_points(fid, face_landmark_points_dict)
+            np_landmark_pts = np.array([
+                [landmark_pts[0].x], [landmark_pts[0].y],
+                [landmark_pts[1].x], [landmark_pts[1].y],
+                [landmark_pts[2].x], [landmark_pts[2].y],
+                [landmark_pts[3].x], [landmark_pts[3].y]
+            ], dtype=np.float)
+
+            current_image_resolution = calibration_image_resolution = frame.shape[:2]
+
+            if (camera_matrix is None):
+                camera_matrix = get_default_camera_matrix(calibration_image_resolution=calibration_image_resolution,
+                                                          current_image_resolution=current_image_resolution)
+
+            if (dist_coefficients is None):
+                dist_coefficients = get_default_distortion_coefficients(camera_type)
+
+            (translation, rotation) = estimate_pose_wrapper(
+                np_landmark_pts,
+                camera_matrix,
+                current_image_resolution,
+                calibration_image_resolution,
+                camera_type,
+                dist_coeffs=dist_coefficients
+            )
+
+            (nosecenter_2d, _) = cv2.projectPoints((0, 0, 0),
+                                                   rotation,
+                                                   translation,
+                                                   camera_matrix,
+                                                   dist_coefficients)
+
+            (arrow_pts, _) = cv2.projectPoints(np.array([[axis_length, 0.0, 0.0],
+                                                         [0, axis_length, 0],
+                                                         [0, 0, axis_length]]),
+                                               rotation,
+                                               translation,
+                                               camera_matrix,
+                                               dist_coefficients)
+
+            nosecenter_origin = tuple(map(int, tuple(nosecenter_2d[0].ravel())))
+            cv2.line(frame, nosecenter_origin, tuple(map(int, tuple(arrow_pts[0].ravel()))), (255, 0, 0), 2) #x blue
+            cv2.line(frame, nosecenter_origin, tuple(map(int, tuple(arrow_pts[1].ravel()))), (0, 255, 0), 2) #y green
+            cv2.line(frame, nosecenter_origin, tuple(map(int, tuple(arrow_pts[2].ravel()))), (0, 0, 255), 2) #z red
+
 
 def get_text_size(text, font, thickness):
     """

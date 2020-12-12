@@ -8,15 +8,19 @@ import csv
 import affvisionpy as af
 import cv2
 import math
+import numpy as np
+import json
 
 from body_listener import BODY_POINTS
 from face_listener import FaceListener as ImageListener
 from object_listener import ObjectListener as ObjectListener
 from occupant_listener import OccupantListener as OccupantListener
 from body_listener import BodyListener as BodyListener
+from pnp_pose_estimator import OPENCV_PINHOLE, OPENCV_FISHEYE
 
 from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo,
-                             get_affectiva_logo, get_bounding_box_points, draw_objects, draw_occupants, draw_bodies)
+                             get_affectiva_logo, get_bounding_box_points, draw_objects, draw_occupants, draw_bodies,
+                             draw_and_calculate_3d_pose)
 
 # Constants
 NOT_A_NUMBER = 'nan'
@@ -85,7 +89,8 @@ def run(csv_data):
             Values to hold for each frame
     """
     parser, args = parse_command_line()
-    input_file, data_dir, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_faces = get_command_line_parameters(
+    input_file, data_dir, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_faces,\
+        estimate_3d_pose, camera_matrix, camera_type, dist_coefficients = get_command_line_parameters(
         parser, args)
 
     start_time = 0
@@ -125,7 +130,8 @@ def run(csv_data):
     logo = get_affectiva_logo(file_width, file_height)
 
     if show_faces:
-        process_face_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+        process_face_input(detector, capture_file, input_file, start_time, output_file, out, logo, args,
+                           camera_matrix, dist_coefficients, camera_type)
     elif args.show_objects:
         process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
     elif args.show_occupants:
@@ -147,7 +153,8 @@ def run(csv_data):
         if not csv_file == DEFAULT_FILE_NAME:
             write_csv_data_to_file(csv_data, csv_file)
 
-def process_face_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
+def process_face_input(detector, capture_file, input_file, start_time, output_file, out, logo, args
+                       , camera_matrix, dist_coefficients, camera_type):
     count = 0
     last_timestamp = 0
 
@@ -200,6 +207,7 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 glasses_dict = listener.glasses_dict.copy()
                 age_metric_dict = listener.age_metric_dict.copy()
                 age_category_dict = listener.age_category_dict.copy()
+                face_landmark_points_dict = listener.face_landmark_points_dict.copy()
                 if args.show_identity:
                     identities_dict = listener.identities_dict.copy()
                 if args.show_drowsiness:
@@ -215,7 +223,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                     "gaze_metric": gaze_metric_dict,
                     "glasses": glasses_dict,
                     "age_metric": age_metric_dict,
-                    "age_category": age_category_dict
+                    "age_category": age_category_dict,
+                    "face_landmark_pts": face_landmark_points_dict
                 }
                 if args.show_identity:
                     listener_metrics["identities"] = identities_dict
@@ -227,6 +236,7 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 draw_affectiva_logo(frame, logo, width, height)
                 if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
                     draw_bounding_box(frame, listener_metrics)
+                    draw_and_calculate_3d_pose(frame, camera_matrix, camera_type, dist_coefficients, listener_metrics)
                     draw_metrics(frame, listener_metrics, identity_names_dict)
 
                 if not args.no_draw:
@@ -679,6 +689,25 @@ def parse_command_line():
     parser.add_argument("--occupant", dest="show_occupants", action='store_true', help="Enable occupant detection")
     parser.add_argument("--body", dest="show_bodies", action='store_true', help="Enable body points detection")
     parser.add_argument("--no-draw", dest="no_draw", action='store_true', help="Don't draw window while processing video, default is set to False")
+    default_estimate_3d_pose_text = "Enable this flag to view 3d pose estimation with the default \
+            camera matrix. For 1920x1080 resolution, this is: [[1920,0,960],[0,1920,540],[0,0,1]]"
+    parser.add_argument("--default_estimate_3d_pose", default=False, action="store_true",
+                        help=default_estimate_3d_pose_text)
+
+    estimate_3d_pose_text = "Provide a camera matrix to use for calculating 3d pose estimation. \
+                Matrix will be a 3x3 numpy array inputted as a string: '[[fx, skew, cx], [0, fy, cy], [0, 0, 1]]'. \
+                fx,fy,cx,cy must be adjusted depending on the relation between \
+                calibration resolution and current image resolution."
+    parser.add_argument("--estimate_3d_pose", help=estimate_3d_pose_text)
+
+    parser.add_argument("--camera_type", default=OPENCV_PINHOLE,
+                        help="Designate the camera type as either 'pinhole' or 'fisheye'. \
+                                  Only used in 3d pose estimation. Default is 'pinhole'.")
+
+    parser.add_argument("--dist_coefficients", default=None,
+                        help="Provide distortion coefficients from camera calibration process. \
+                                  For fisheye cameras, input a 4x1 numpy array as a string: default='[[0],[0],[0],[0]]'. \
+                                  For pinhole cameras, input a 5x1 numpy array as a string: default='[[0],[0],[0],[0],[0]]'.")
     args = parser.parse_args()
     return parser, args
 
@@ -793,7 +822,21 @@ def get_command_line_parameters(parser, args):
     csv_file = args.file
     frame_width = int(args.res[0])
     frame_height = int(args.res[1])
-    return input_file, data_dir, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_faces
+    estimate_3d_pose = args.default_estimate_3d_pose
+    if args.estimate_3d_pose:
+        camera_matrix = np.array(json.loads(args.estimate_3d_pose), dtype="double")
+        estimate_3d_pose = True
+    else:
+        camera_matrix = None
+
+    if args.dist_coefficients:
+        dist_coefficients = np.array(json.loads(args.dist_coefficients), dtype="double")
+    else:
+        dist_coefficients = None
+
+    camera_type = args.camera_type
+    return (input_file, data_dir, max_num_of_faces, csv_file, output_file, frame_width, frame_height, show_faces,
+            estimate_3d_pose, camera_matrix, camera_type, dist_coefficients)
 
 if __name__ == "__main__":
     csv_data = list()
