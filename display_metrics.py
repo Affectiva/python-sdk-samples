@@ -89,7 +89,7 @@ def draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y):
     draw_outlined_text(frame, " :age_category", upper_right_x + LEFT_METRIC_OFFSET, upper_right_y)
     upper_right_y += LINE_HEIGHT
 
-def draw_outlined_text(frame, text, x1, y1):
+def draw_outlined_text(frame, text, x1, y1, inner_color=(255,255,255)):
     """
     Draw outlined text.
 
@@ -111,7 +111,7 @@ def draw_outlined_text(frame, text, x1, y1):
     cv2.putText(frame, text, (x1, y1),
                 cv2.FONT_HERSHEY_DUPLEX,
                 TEXT_SIZE,
-                (255, 255, 255), 1, cv2.LINE_AA)
+                inner_color, 1, cv2.LINE_AA)
 
 def draw_metric_rects(frame, metric_key, metric_val, x1, y1):
     """
@@ -481,7 +481,17 @@ def display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y):
     key_name = "drowsiness level: "
     key_text_width, key_text_height = get_text_size(key_name, cv2.FONT_HERSHEY_SIMPLEX, 1)
     draw_outlined_text(frame, key_name, abs(upper_left_x - key_text_width - LEFT_METRIC_OFFSET), upper_left_y)
-    draw_outlined_text(frame, drowsiness_metric.drowsiness.name, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y)
+
+    text_color = (255,255,255)
+    val_text = drowsiness_metric.drowsiness.name
+    if val_text == "asleep":
+        text_color = (51, 87, 255)
+    elif val_text == "severe":
+        text_color = (90, 160, 250)
+    elif val_text == "moderate":
+        text_color = (0, 204, 255)
+        
+    draw_outlined_text(frame, drowsiness_metric.drowsiness.name, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y, text_color)
 
 def display_measurements(key_name, val, upper_left_y, frame, x1):
     """

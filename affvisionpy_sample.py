@@ -22,7 +22,8 @@ from pnp_pose_estimator import OPENCV_PINHOLE, OPENCV_FISHEYE
 from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo,
                              get_affectiva_logo, get_bounding_box_points, draw_objects, draw_occupants, draw_bodies,
                              draw_and_calculate_3d_pose)
-from tcam_utils import (tcam_process_face_input, tcam_process_object_input, tcam_process_occupant_bkp_input, tcam_process_gaze_input)
+from tcam_utils import (tcam_process_face_input, tcam_process_object_input, tcam_process_occupant_bkp_input, 
+                        tcam_process_gaze_input, tcam_process_drowsiness_input)
 
 
 # Constants
@@ -132,8 +133,8 @@ def run(csv_data):
             tcam_process_occupant_bkp_input(detector, Tis, start_time, output_file, out, logo, args)
         elif args.show_gaze_c:
             tcam_process_gaze_input(detector, Tis, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients)
-        # elif args.show_drowsiness_c:
-        #     tcam_process_drowsiness_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+        elif args.show_drowsiness_c:
+            tcam_process_drowsiness_input(detector, Tis, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients)
 
         Tis.Stop_pipeline()
         cv2.destroyAllWindows()

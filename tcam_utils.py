@@ -13,7 +13,7 @@ from body_listener import BodyListener as BodyListener
 
 from display_metrics import (draw_affectiva_logo, check_bounding_box_outside, draw_bounding_box, draw_metrics,
                              draw_bodies, draw_objects, draw_and_calculate_3d_pose, draw_gaze_region, get_bounding_box_points, display_measurements,
-                             display_left_metric)
+                             display_left_metric, display_drowsiness, display_expression)
 
 # TODO- fix this 
 OBJECT_CALLBACK_INTERVAL = 500
@@ -290,7 +290,6 @@ def get_gaze_bbox_input_results(face_listener, frame):
                 display_measurements(key.name, val, upper_left_y, frame, upper_left_x)
                 upper_left_y += 25
 
-            print(expressions_dict[fid])
             display_left_metric("eye_closure", expressions_dict[fid][af.Expression.eye_closure], upper_left_x, upper_left_y, frame)
             upper_left_y += 25
 
@@ -321,6 +320,83 @@ def tcam_process_gaze_input(detector, tis, start_time, output_file, out, logo, a
                 draw_affectiva_logo(frame, logo, frame.shape[1], frame.shape[0])
                 get_gaze_input_results(listener, frame)
                 get_gaze_bbox_input_results(listener, frame)
+                get_3d_pose_input_results(listener, frame, camera_matrix, camera_type, dist_coefficients)
+                cv2.imshow('Processed Frame', frame)
+
+            if output_file is not None:
+                out.write(frame)
+
+            if cv2.waitKey(1) == 27:
+                kill_signal_handler.exit_gracefully(signal.SIGTERM)
+
+    print("Gracefully killing tcam stuff")
+    detector.stop()
+
+
+def get_drowsiness_input_results(face_listener, frame):
+    face_listener.mutex.acquire()
+
+    faces = face_listener.faces.copy()
+    bounding_box_dict = face_listener.bounding_box_dict.copy()
+    expressions_dict = face_listener.expressions_dict.copy()
+    glasses_dict = face_listener.glasses_dict.copy()
+    drowsiness_dict = face_listener.drowsiness_dict.copy()
+
+    face_listener.mutex.release()
+
+    listener_metrics = {
+        "bounding_box": bounding_box_dict,
+        "glasses": glasses_dict,
+        "expressions": expressions_dict
+    }
+
+    height = frame.shape[0]
+    width = frame.shape[1]
+    if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
+        draw_bounding_box(frame, listener_metrics, False)
+        for fid in faces:
+            upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
+            box_width = lower_right_x - upper_left_x
+            upper_right_x = upper_left_x + box_width
+            upper_right_y = upper_left_y
+
+            display_drowsiness(frame, drowsiness_dict[fid], upper_left_x, upper_left_y)
+            upper_left_y += 25
+            display_left_metric("drowsiness confidence", drowsiness_dict[fid].confidence, upper_left_x, upper_left_y, frame)
+            upper_left_y += 25
+
+            display_expression("eye_closure", expressions_dict[fid][af.Expression.eye_closure], upper_right_x, upper_right_y, frame)
+            upper_right_y += 25
+            display_expression("yawn", expressions_dict[fid][af.Expression.yawn], upper_right_x, upper_right_y, frame)
+            upper_right_y += 25
+            display_expression("blink_rate", expressions_dict[fid][af.Expression.blink_rate], upper_right_x, upper_right_y, frame)
+            upper_right_y += 25
+            display_expression("glasses", glasses_dict[fid], upper_right_x, upper_right_y, frame)
+            upper_right_y += 25
+
+
+def tcam_process_drowsiness_input(detector, tis, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients, camera_type="fisheye"):
+    features = {af.Feature.faces, af.Feature.appearances, af.Feature.expressions, af.Feature.drowsiness}
+    detector.enable_features(features)
+
+    listener = ImageListener()
+    detector.set_image_listener(listener)
+
+    detector.start()
+
+    kill_signal_handler = KillSignalHandler()
+    while not kill_signal_handler.killer:
+        frame = get_tcam_frame(tis, 30)
+        if frame is not None:
+            afframe = create_afframe(frame, start_time)
+            try:
+                detector.process(afframe)
+            except Exception as exp:
+                print(exp)
+
+            if not args.no_draw:
+                draw_affectiva_logo(frame, logo, frame.shape[1], frame.shape[0])
+                get_drowsiness_input_results(listener, frame)
                 get_3d_pose_input_results(listener, frame, camera_matrix, camera_type, dist_coefficients)
                 cv2.imshow('Processed Frame', frame)
 

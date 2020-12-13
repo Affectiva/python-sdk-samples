@@ -25,7 +25,7 @@ class FaceListener(af.ImageListener):
         self.faces = defaultdict()
         self.face_landmark_points_dict = defaultdict()
 
-        # self.drowsiness_dict = defaultdict()
+        self.drowsiness_dict = defaultdict()
         # self.identities_dict = defaultdict()
         self.gaze_metric_dict = defaultdict()
         self.glasses_dict = defaultdict()
@@ -62,7 +62,7 @@ class FaceListener(af.ImageListener):
                                            face.get_bounding_box()[1].x,
                                            face.get_bounding_box()[1].y,
                                            face.get_confidence()]
-            # self.drowsiness_dict[fid] = face.get_drowsiness()
+            self.drowsiness_dict[fid] = face.get_drowsiness()
             # self.identities_dict[fid] = face.get_identity().identity
             self.gaze_metric_dict[fid] = face.get_gaze()
             self.glasses_dict[fid] = face.get_glasses()
