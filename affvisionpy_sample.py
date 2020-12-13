@@ -10,6 +10,7 @@ import cv2
 import math
 import numpy as np
 import json
+import TIS
 
 from body_listener import BODY_POINTS
 from face_listener import FaceListener as ImageListener
@@ -21,6 +22,8 @@ from pnp_pose_estimator import OPENCV_PINHOLE, OPENCV_FISHEYE
 from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo,
                              get_affectiva_logo, get_bounding_box_points, draw_objects, draw_occupants, draw_bodies,
                              draw_and_calculate_3d_pose)
+from tcam_utils import (tcam_process_face_input, tcam_process_object_input, tcam_process_occupant_bkp_input)
+
 
 # Constants
 NOT_A_NUMBER = 'nan'
@@ -31,6 +34,8 @@ DATA_DIR_ENV_VAR = "AFFECTIVA_VISION_DATA_DIR"
 OBJECT_CALLBACK_INTERVAL = 500
 OCCUPANT_CALLBACK_INTERVAL = 500
 BODY_CALLBACK_INTERVAL = 500
+# todo: make this an arg
+tcam_serial = 35910245
 
 HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence',
                     'interocular_distance',
@@ -101,59 +106,89 @@ def run(csv_data):
         detector = af.SyncFrameDetector(data_dir, max_num_of_faces)
 
     fps = 30
-    if args.video:
-        get_video_fps(input_file, fps)
-    capture_file = cv2.VideoCapture(input_file)
+    if tcam_serial is not None:
+        Tis = TIS.TIS(tcam_serial, frame_width, frame_height, fps, True)
+        Tis.Start_pipeline()
 
-    if not args.video:
-        capture_file.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
-        capture_file.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
-        # If cv2 silently fails, default to 1920 x 1080 instead of 640 x 480
-        if capture_file.get(3) != frame_width or capture_file.get(4) != frame_height:
-            print(capture_file.get(3), "x", capture_file.get(4), "is an unsupported resolution, defaulting to 1920 x 1080")
-            capture_file.set(cv2.CAP_PROP_FRAME_HEIGHT, DEFAULT_FRAME_HEIGHT)
-            capture_file.set(cv2.CAP_PROP_FRAME_WIDTH, DEFAULT_FRAME_WIDTH)
-            frame_width = DEFAULT_FRAME_WIDTH
-            frame_height = DEFAULT_FRAME_HEIGHT
+        print("Setting tiscam properties...")
+        time.sleep(3)
+        Tis.Set_Property("Tonemapping", True)
+        Tis.Set_Property("Tonemapping Intensity", 6.0)
+        Tis.Set_Property("Tonemapping Global Brightness", 0.5)
+        Tis.Set_Property("Exposure Auto Reference", 30)
+        print("... and done!!")
 
-        file_width = frame_width
-        file_height = frame_height
+        out = None
+        if output_file is not None:
+            out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps, (frame_width, frame_height))
+
+        logo = get_affectiva_logo(frame_width, frame_height)
+
+        if args.show_emo_exp_c:
+            tcam_process_face_input(detector, Tis, start_time, output_file, out, logo, args)
+        elif args.show_object_c:
+            tcam_process_object_input(detector, Tis, start_time, output_file, out, logo, args)
+        elif args.show_occupants_c:
+            tcam_process_occupant_bkp_input(detector, Tis, start_time, output_file, out, logo, args)
+        elif args.show_gaze_c:
+            process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+        # elif args.show_drowsiness_c:
+        #     process_drowsiness_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+
+        Tis.Stop_pipeline()
+        cv2.destroyAllWindows()
 
     else:
-        file_width = int(capture_file.get(3))
-        file_height = int(capture_file.get(4))
+        capture_file = cv2.VideoCapture(input_file)
+        if args.video:
+            get_video_fps(input_file, fps)
+            file_width = int(capture_file.get(3))
+            file_height = int(capture_file.get(4))
+        else:
+            capture_file.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
+            capture_file.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
+            # If cv2 silently fails, default to 1920 x 1080 instead of 640 x 480
+            if capture_file.get(3) != frame_width or capture_file.get(4) != frame_height:
+                print(capture_file.get(3), "x", capture_file.get(4), "is an unsupported resolution, defaulting to 1920 x 1080")
+                capture_file.set(cv2.CAP_PROP_FRAME_HEIGHT, DEFAULT_FRAME_HEIGHT)
+                capture_file.set(cv2.CAP_PROP_FRAME_WIDTH, DEFAULT_FRAME_WIDTH)
+                frame_width = DEFAULT_FRAME_WIDTH
+                frame_height = DEFAULT_FRAME_HEIGHT
 
-    out = None
-    if output_file is not None:
-        out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps, (file_width, file_height))
+            file_width = frame_width
+            file_height = frame_height
 
-    logo = get_affectiva_logo(file_width, file_height)
+        out = None
+        if output_file is not None:
+            out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps, (file_width, file_height))
 
-    if args.show_emo_exp_c:
-        process_face_input(detector, capture_file, input_file, start_time, output_file, out, logo, args,
-                           camera_matrix, dist_coefficients, camera_type)
-    elif args.show_object_c:
-        process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
-    elif args.show_occupants_c:
-        process_occupant_bkp_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
-    elif args.show_gaze_c:
-        process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
-    # elif args.show_drowsiness_c:
-    #     process_drowsiness_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+        logo = get_affectiva_logo(file_width, file_height)
 
-    capture_file.release()
-    cv2.destroyAllWindows()
+        if args.show_emo_exp_c:
+            process_face_input(detector, capture_file, input_file, start_time, output_file, out, logo, args,
+                               camera_matrix, dist_coefficients, camera_type)
+        elif args.show_object_c:
+            process_object_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+        elif args.show_occupants_c:
+            process_occupant_bkp_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+        elif args.show_gaze_c:
+            process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+        # elif args.show_drowsiness_c:
+        #     process_drowsiness_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
 
-    # If video file is provided as an input
-    if not isinstance(input_file, int):
-        if csv_file == DEFAULT_FILE_NAME:
-            if os.sep in input_file:
-                csv_file = str(input_file.rsplit(os.sep, 1)[1])
-            csv_file = csv_file.split(".")[0]
-        write_csv_data_to_file(csv_data, csv_file)
-    else:
-        if not csv_file == DEFAULT_FILE_NAME:
+        capture_file.release()
+        cv2.destroyAllWindows()
+
+        # If video file is provided as an input
+        if not isinstance(input_file, int):
+            if csv_file == DEFAULT_FILE_NAME:
+                if os.sep in input_file:
+                    csv_file = str(input_file.rsplit(os.sep, 1)[1])
+                csv_file = csv_file.split(".")[0]
             write_csv_data_to_file(csv_data, csv_file)
+        else:
+            if not csv_file == DEFAULT_FILE_NAME:
+                write_csv_data_to_file(csv_data, csv_file)
 
 def process_face_input(detector, capture_file, input_file, start_time, output_file, out, logo, args
                        , camera_matrix, dist_coefficients, camera_type):
