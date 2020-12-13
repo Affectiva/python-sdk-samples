@@ -30,12 +30,6 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
             dictionary of dictionaries, gives current listener state
 
     """
-    # draw gaze region for the first face. (ideally we should draw it for the driver only)
-    # gaze_metrics = listener_metrics["gaze_metric"]
-    # if len(gaze_metrics):
-    #     metric = next(iter(gaze_metrics.values()))
-    #     draw_gaze_region(frame, metric)
-
     for fid in listener_metrics["expressions"].keys():
         expressions = listener_metrics["expressions"][fid]
         emotions = listener_metrics["emotions"][fid]
