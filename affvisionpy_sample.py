@@ -35,8 +35,6 @@ DATA_DIR_ENV_VAR = "AFFECTIVA_VISION_DATA_DIR"
 OBJECT_CALLBACK_INTERVAL = 500
 OCCUPANT_CALLBACK_INTERVAL = 500
 BODY_CALLBACK_INTERVAL = 500
-# todo: make this an arg
-tcam_serial = 35910245
 
 HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence',
                     'interocular_distance',
@@ -107,8 +105,8 @@ def run(csv_data):
         detector = af.SyncFrameDetector(data_dir, max_num_of_faces)
 
     fps = 30
-    if tcam_serial is not None:
-        Tis = TIS.TIS(tcam_serial, frame_width, frame_height, fps, True)
+    if args.tcam_serial is not None:
+        Tis = TIS.TIS(args.tcam_serial, frame_width, frame_height, fps, True)
         Tis.Start_pipeline()
 
         print("Setting tiscam properties...")
@@ -174,8 +172,8 @@ def run(csv_data):
             process_occupant_bkp_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
         elif args.show_gaze_c:
             process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
-        # elif args.show_drowsiness_c:
-        #     process_drowsiness_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+        elif args.show_drowsiness_c:
+            process_drowsiness_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
 
         capture_file.release()
         cv2.destroyAllWindows()
@@ -857,6 +855,7 @@ def parse_command_line():
                         help="number of faces to identify in the frame")
     parser.add_argument("-c", "--camera", dest="camera", required=False, const="0", nargs='?', default=0,
                         help="enable this parameter take input from the webcam and provide a camera id for the webcam")
+    parser.add_argument("-t", "--tcam_serial", dest="tcam_serial", required=False, help="Serial number for our fisheye cams")
     parser.add_argument("-o", "--output", dest="output", required=False,
                         help="name of the output video file")
     parser.add_argument("-f", "--file", dest="file", required=False, default=DEFAULT_FILE_NAME,
