@@ -125,7 +125,7 @@ def run(csv_data):
         logo = get_affectiva_logo(frame_width, frame_height)
 
         if args.show_emo_exp_c:
-            tcam_process_face_input(detector, Tis, start_time, output_file, out, logo, args)
+            tcam_process_face_input(detector, Tis, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients)
         elif args.show_object_c:
             tcam_process_object_input(detector, Tis, start_time, output_file, out, logo, args)
         elif args.show_occupants_c:

@@ -12,7 +12,7 @@ from occupant_listener import OccupantListener as OccupantListener
 from body_listener import BodyListener as BodyListener
 
 from display_metrics import (draw_affectiva_logo, check_bounding_box_outside, draw_bounding_box, draw_metrics,
-                             draw_bodies, draw_objects)
+                             draw_bodies, draw_objects, draw_and_calculate_3d_pose)
 
 # TODO- fix this 
 OBJECT_CALLBACK_INTERVAL = 500
@@ -52,19 +52,6 @@ def create_afframe(frame, start_time):
     afframe = af.Frame(width, height, frame, af.Frame.ColorFormat.bgr, int(curr_timestamp))
     return afframe
 
-def process_input(detector, features, listener, tis, start_time):
-    start_detector(detector, features, listener)
-    kill_signal_handler = KillSignalHandler()
-    while not kill_signal_handler.killer:
-        frame, height, width = get_tcam_frame(tis, 30)
-        if frame is not None:
-            afframe = create_afframe(frame, start_time)
-            try:
-                detector.process(afframe)
-            except Exception as exp:
-                print(exp)
-
-
 def get_face_input_results(listener, frame):
     listener.mutex.acquire()
 
@@ -87,6 +74,19 @@ def get_face_input_results(listener, frame):
         draw_bounding_box(frame, listener_metrics, True)
         draw_metrics(frame, listener_metrics, {})
 
+def get_3d_pose_input_results(listener, frame, camera_matrix, camera_type, dist_coefficients):
+    listener.mutex.acquire()
+    face_landmark_points_dict = listener.face_landmark_points_dict.copy()
+    listener.mutex.release()
+
+    listener_metrics = {
+        "face_landmark_pts": face_landmark_points_dict
+    }
+
+    if (len(face_landmark_points_dict) > 0):
+        draw_and_calculate_3d_pose(frame, camera_matrix, camera_type, dist_coefficients, listener_metrics)
+
+
 def get_face_bbox_input_results(face_listener, frame):
     face_listener.mutex.acquire()
 
@@ -105,7 +105,7 @@ def get_face_bbox_input_results(face_listener, frame):
         draw_bounding_box(frame, listener_metrics, False)
 
 
-def tcam_process_face_input(detector, tis, start_time, output_file, out, logo, args):
+def tcam_process_face_input(detector, tis, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients, camera_type="fisheye"):
     features = {af.Feature.expressions, af.Feature.emotions}
     listener = ImageListener()
     start_detector(detector, features, listener)
@@ -123,6 +123,7 @@ def tcam_process_face_input(detector, tis, start_time, output_file, out, logo, a
             if not args.no_draw:
                 draw_affectiva_logo(frame, logo, frame.shape[1], frame.shape[0])
                 get_face_input_results(listener, frame)
+                get_3d_pose_input_results(listener, frame, camera_matrix, camera_type, dist_coefficients)
                 cv2.imshow('Processed Frame', frame)
 
             if output_file is not None:
