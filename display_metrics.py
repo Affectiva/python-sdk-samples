@@ -66,6 +66,9 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         #     upper_left_y += LINE_HEIGHT
 
         for key, val in expressions.items():
+            if ("blink_rate" in key.name) or ("blink" in key.name):
+                continue
+            
             display_expression(key.name, val, upper_right_x, upper_right_y, frame)
             upper_right_y += LINE_HEIGHT
 

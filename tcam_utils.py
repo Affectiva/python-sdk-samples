@@ -80,12 +80,8 @@ def get_3d_pose_input_results(listener, frame, camera_matrix, camera_type, dist_
     face_landmark_points_dict = listener.face_landmark_points_dict.copy()
     listener.mutex.release()
 
-    listener_metrics = {
-        "face_landmark_pts": face_landmark_points_dict
-    }
-
     if (len(face_landmark_points_dict) > 0):
-        draw_and_calculate_3d_pose(frame, camera_matrix, camera_type, dist_coefficients, listener_metrics)
+        draw_and_calculate_3d_pose(frame, camera_matrix, camera_type, dist_coefficients, {"face_landmark_pts": face_landmark_points_dict})
 
 
 def get_face_bbox_input_results(face_listener, frame):
@@ -149,7 +145,7 @@ def get_object_input_results(object_listener, frame):
         "object_type": type_dict
     }
 
-    if len(objects) > 0 and not check_bounding_box_outside(frame.shape[1], frame.shape[0], listener_metrics["bounding_box"]):
+    if len(objects) > 0 and not check_bounding_box_outside(frame.shape[1], frame.shape[0], bounding_box_dict):
         draw_objects(frame, listener_metrics)
 
 def get_body_input_results(body_listener, frame):
@@ -158,12 +154,8 @@ def get_body_input_results(body_listener, frame):
     body_points_dict = body_listener.bodyPoints.copy()
     body_listener.mutex.release()
 
-    listener_metrics = {
-        "body_points": body_points_dict
-    }
-
     if len(bodies) > 0:
-        draw_bodies(frame, listener_metrics)
+        draw_bodies(frame, {"body_points": body_points_dict})
 
 
 def tcam_process_object_input(detector, tis, start_time, output_file, out, logo, args):
@@ -250,10 +242,6 @@ def get_gaze_input_results(face_listener, frame):
     gaze_metrics = face_listener.gaze_metric_dict.copy()
     face_listener.mutex.release()
 
-    listener_metrics = {
-        "gaze_region": gaze_metrics
-    }
-
     if len(gaze_metrics):
         metric = next(iter(gaze_metrics.values()))
         draw_gaze_region(frame, metric)
@@ -300,23 +288,17 @@ def get_drowsiness_input_results(face_listener, frame):
     faces = face_listener.faces.copy()
     bounding_box_dict = face_listener.bounding_box_dict.copy()
     expressions_dict = face_listener.expressions_dict.copy()
-    glasses_dict = face_listener.glasses_dict.copy()
     drowsiness_dict = face_listener.drowsiness_dict.copy()
+    glasses_dict = face_listener.glasses_dict.copy()
 
     face_listener.mutex.release()
-
-    listener_metrics = {
-        "bounding_box": bounding_box_dict,
-        "glasses": glasses_dict,
-        "expressions": expressions_dict
-    }
 
     height = frame.shape[0]
     width = frame.shape[1]
     if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
-        draw_bounding_box(frame, listener_metrics, False)
+        draw_bounding_box(frame, {"bounding_box": bounding_box_dict}, False)
         for fid in faces:
-            upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
+            upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, bounding_box_dict)
             box_width = lower_right_x - upper_left_x
             upper_right_x = upper_left_x + box_width
             upper_right_y = upper_left_y
@@ -325,19 +307,15 @@ def get_drowsiness_input_results(face_listener, frame):
             upper_left_y += 25
             display_left_metric("drowsiness confidence", drowsiness_dict[fid].confidence, upper_left_x, upper_left_y, frame)
             upper_left_y += 25
-
             display_expression("eye_closure", expressions_dict[fid][af.Expression.eye_closure], upper_right_x, upper_right_y, frame)
             upper_right_y += 25
             display_expression("yawn", expressions_dict[fid][af.Expression.yawn], upper_right_x, upper_right_y, frame)
             upper_right_y += 25
-            display_expression("blink_rate", expressions_dict[fid][af.Expression.blink_rate], upper_right_x, upper_right_y, frame)
-            upper_right_y += 25
             display_expression("glasses", glasses_dict[fid], upper_right_x, upper_right_y, frame)
             upper_right_y += 25
 
-
 def tcam_process_drowsiness_input(detector, tis, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients, camera_type="fisheye"):
-    features = {af.Feature.faces, af.Feature.appearances, af.Feature.expressions, af.Feature.drowsiness}
+    features = {af.Feature.faces, af.Feature.expressions, af.Feature.drowsiness, af.Feature.appearances}
     detector.enable_features(features)
 
     listener = ImageListener()
