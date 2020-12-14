@@ -258,47 +258,8 @@ def get_gaze_input_results(face_listener, frame):
         metric = next(iter(gaze_metrics.values()))
         draw_gaze_region(frame, metric)
 
-def get_gaze_bbox_input_results(face_listener, frame):
-    face_listener.mutex.acquire()
-
-    faces = face_listener.faces.copy()
-    bounding_box_dict = face_listener.bounding_box_dict.copy()
-    measurements_dict = face_listener.measurements_dict.copy()
-    expressions_dict = face_listener.expressions_dict.copy()
-    glasses_dict = face_listener.glasses_dict.copy()
-
-    face_listener.mutex.release()
-
-    listener_metrics = {
-        "bounding_box": bounding_box_dict,
-        "measurements": measurements_dict,
-        "glasses": glasses_dict,
-        "expressions": expressions_dict
-    }
-
-    height = frame.shape[0]
-    width = frame.shape[1]
-    if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
-        draw_bounding_box(frame, listener_metrics, False)
-        for fid in faces:
-            upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
-            box_width = lower_right_x - upper_left_x
-            upper_right_x = upper_left_x + box_width
-            upper_right_y = upper_left_y
-
-            for key, val in measurements_dict[fid].items():
-                display_measurements(key.name, val, upper_left_y, frame, upper_left_x)
-                upper_left_y += 25
-
-            display_left_metric("eye_closure", expressions_dict[fid][af.Expression.eye_closure], upper_left_x, upper_left_y, frame)
-            upper_left_y += 25
-
-            display_left_metric("glasses", glasses_dict[fid], upper_left_x, upper_left_y, frame)
-            upper_left_y += 25
-
-
 def tcam_process_gaze_input(detector, tis, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients, camera_type="fisheye"):
-    features = {af.Feature.faces, af.Feature.gaze, af.Feature.appearances, af.Feature.expressions}
+    features = {af.Feature.faces, af.Feature.gaze}
     detector.enable_features(features)
 
     listener = ImageListener()
@@ -319,7 +280,7 @@ def tcam_process_gaze_input(detector, tis, start_time, output_file, out, logo, a
             if not args.no_draw:
                 draw_affectiva_logo(frame, logo, frame.shape[1], frame.shape[0])
                 get_gaze_input_results(listener, frame)
-                get_gaze_bbox_input_results(listener, frame)
+                get_face_bbox_input_results(listener, frame)
                 get_3d_pose_input_results(listener, frame, camera_matrix, camera_type, dist_coefficients)
                 cv2.imshow('Processed Frame', frame)
 
