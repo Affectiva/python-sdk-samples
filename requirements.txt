@@ -3,3 +3,5 @@
 tqdm
 numpy
 opencv-contrib-python==4.4.0.42
+pycairo
+PyGObject

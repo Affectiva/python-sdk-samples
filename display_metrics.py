@@ -465,6 +465,18 @@ def display_gaze(frame, gaze_region_name, upper_left_x, upper_left_y):
     draw_outlined_text(frame, "gaze_region: ", abs(upper_left_x - gaze_text_size - LEFT_METRIC_OFFSET), upper_left_y)
     draw_outlined_text(frame, gaze_region_name, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y)
 
+def display_distraction(frame, eyes_on_road, upper_left_x, upper_left_y):
+    if eyes_on_road:
+        distraction_text = "on road"
+        distraction_text_color = (150,210,50)
+    else:
+        distraction_text = "off road"
+        distraction_text_color = (51, 87, 255)
+
+    text_size = 54
+    draw_outlined_text(frame, "eyes: ", abs(upper_left_x - text_size - LEFT_METRIC_OFFSET), upper_left_y)
+    draw_outlined_text(frame, distraction_text, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y, distraction_text_color)
+
 def display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y):
     """
     Display drowsiness metrics on screen to the left of the bounding box

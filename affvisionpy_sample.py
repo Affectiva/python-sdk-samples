@@ -171,9 +171,9 @@ def run(csv_data):
         elif args.show_occupants_c:
             process_occupant_bkp_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
         elif args.show_gaze_c:
-            process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+            print("gaze is not implemented for non-fisheyes")
         elif args.show_drowsiness_c:
-            process_drowsiness_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
+            print("drowsiness is not implemented for non-fisheyes")
 
         capture_file.release()
         cv2.destroyAllWindows()

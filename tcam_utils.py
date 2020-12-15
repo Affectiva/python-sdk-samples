@@ -13,13 +13,14 @@ from body_listener import BodyListener as BodyListener
 
 from display_metrics import (draw_affectiva_logo, check_bounding_box_outside, draw_bounding_box, draw_metrics,
                              draw_bodies, draw_objects, draw_and_calculate_3d_pose, draw_gaze_region, get_bounding_box_points, display_measurements,
-                             display_left_metric, display_drowsiness, display_expression)
+                             display_left_metric, display_drowsiness, display_expression, display_distraction)
 
 # TODO- fix this 
 OBJECT_CALLBACK_INTERVAL = 500
 OCCUPANT_CALLBACK_INTERVAL = 500
 BODY_CALLBACK_INTERVAL = 500
 
+TIME_OF_LAST_EYE_OPEN = time.time()
 
 class KillSignalHandler():
   killer = False
@@ -27,7 +28,7 @@ class KillSignalHandler():
     signal.signal(signal.SIGINT, self.exit_gracefully)
     signal.signal(signal.SIGTERM, self.exit_gracefully)
 
-  def exit_gracefully(self, signum):
+  def exit_gracefully(self, signum, frame):
     self.killer = True
 
 
@@ -127,7 +128,7 @@ def tcam_process_face_input(detector, tis, start_time, output_file, out, logo, a
                 out.write(frame)
 
             if cv2.waitKey(1) == 27:
-                kill_signal_handler.exit_gracefully(signal.SIGTERM)
+                kill_signal_handler.exit_gracefully(signal.SIGTERM, {})
 
     print("Gracefully killing tcam stuff")
     detector.stop()
@@ -192,7 +193,7 @@ def tcam_process_object_input(detector, tis, start_time, output_file, out, logo,
                 out.write(frame)
 
             if cv2.waitKey(1) == 27:
-                kill_signal_handler.exit_gracefully(signal.SIGTERM)
+                kill_signal_handler.exit_gracefully(signal.SIGTERM, {})
 
     print("Gracefully killing tcam stuff")
     detector.stop()
@@ -231,7 +232,7 @@ def tcam_process_occupant_bkp_input(detector, tis, start_time, output_file, out,
                 out.write(frame)
 
             if cv2.waitKey(1) == 27:
-                kill_signal_handler.exit_gracefully(signal.SIGTERM)
+                kill_signal_handler.exit_gracefully(signal.SIGTERM, {})
 
     print("Gracefully killing tcam stuff")
     detector.stop()
@@ -240,11 +241,29 @@ def tcam_process_occupant_bkp_input(detector, tis, start_time, output_file, out,
 def get_gaze_input_results(face_listener, frame):
     face_listener.mutex.acquire()
     gaze_metrics = face_listener.gaze_metric_dict.copy()
+    bounding_box_dict = face_listener.bounding_box_dict.copy()
     face_listener.mutex.release()
 
     if len(gaze_metrics):
-        metric = next(iter(gaze_metrics.values()))
-        draw_gaze_region(frame, metric)
+        # this relies on the assumption there will only be one face detected
+        gaze_metric = next(iter(gaze_metrics.values()))
+        draw_gaze_region(frame, gaze_metric)
+        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(0, bounding_box_dict)
+
+        global TIME_OF_LAST_EYE_OPEN
+        curr_timestamp = time.time()
+        gaze_idx = int(gaze_metric.gaze_region)
+
+        if gaze_idx is 0:
+            eyes_closed_prolonged = (curr_timestamp - TIME_OF_LAST_EYE_OPEN) > 1
+        else:
+            eyes_closed_prolonged = False
+            TIME_OF_LAST_EYE_OPEN = curr_timestamp
+
+        # if gazing in the correct region, or if region is unknown but BRIEFLY
+        eyes_on_road = (gaze_idx == 1) or (gaze_idx == 0 and not eyes_closed_prolonged)
+
+        display_distraction(frame, eyes_on_road, upper_left_x, upper_left_y)
 
 def tcam_process_gaze_input(detector, tis, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients, camera_type="fisheye"):
     features = {af.Feature.faces, af.Feature.gaze}
@@ -276,7 +295,7 @@ def tcam_process_gaze_input(detector, tis, start_time, output_file, out, logo, a
                 out.write(frame)
 
             if cv2.waitKey(1) == 27:
-                kill_signal_handler.exit_gracefully(signal.SIGTERM)
+                kill_signal_handler.exit_gracefully(signal.SIGTERM, {})
 
     print("Gracefully killing tcam stuff")
     detector.stop()
@@ -343,7 +362,7 @@ def tcam_process_drowsiness_input(detector, tis, start_time, output_file, out, l
                 out.write(frame)
 
             if cv2.waitKey(1) == 27:
-                kill_signal_handler.exit_gracefully(signal.SIGTERM)
+                kill_signal_handler.exit_gracefully(signal.SIGTERM, {})
 
     print("Gracefully killing tcam stuff")
     detector.stop()
