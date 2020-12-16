@@ -22,6 +22,8 @@ OCCUPANT_CALLBACK_INTERVAL = 500
 BODY_CALLBACK_INTERVAL = 500
 
 TIME_OF_LAST_EYE_OPEN = time.time()
+TIME_OF_LAST_DISTRACTION_POLL = time.time()
+EYES_ON_ROAD = False
 
 class KillSignalHandler():
   killer = False
@@ -278,6 +280,8 @@ def tcam_process_occupant_bkp_input(detector, tis, start_time, output_file, out,
 
 
 def get_gaze_input_results(face_listener, frame):
+    global TIME_OF_LAST_DISTRACTION_POLL, TIME_OF_LAST_EYE_OPEN, EYES_ON_ROAD
+
     face_listener.mutex.acquire()
     gaze_metrics = face_listener.gaze_metric_dict.copy()
     bounding_box_dict = face_listener.bounding_box_dict.copy()
@@ -290,11 +294,9 @@ def get_gaze_input_results(face_listener, frame):
         draw_gaze_region(frame, gaze_metric)
 
         upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, bounding_box_dict)
-
-        global TIME_OF_LAST_EYE_OPEN
         curr_timestamp = time.time()
         gaze_idx = int(gaze_metric.gaze_region)
-
+        
         if gaze_idx is 0:
             eyes_closed_prolonged = (curr_timestamp - TIME_OF_LAST_EYE_OPEN) > 1
         else:
@@ -304,7 +306,11 @@ def get_gaze_input_results(face_listener, frame):
         # if gazing in the correct region, or if region is unknown but BRIEFLY
         eyes_on_road = (gaze_idx == 1) or (gaze_idx == 0 and not eyes_closed_prolonged)
 
-        display_distraction(frame, eyes_on_road, upper_left_x, upper_left_y)
+        if (curr_timestamp - TIME_OF_LAST_DISTRACTION_POLL) > 1 or eyes_on_road:
+            EYES_ON_ROAD = eyes_on_road
+            TIME_OF_LAST_DISTRACTION_POLL = curr_timestamp
+
+        display_distraction(frame, EYES_ON_ROAD, upper_left_x, upper_left_y)
 
 def tcam_process_gaze_input(detector, tis, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients, camera_type="fisheye"):
     features = {af.Feature.faces, af.Feature.gaze}
