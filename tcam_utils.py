@@ -285,9 +285,11 @@ def get_gaze_input_results(face_listener, frame):
 
     if len(gaze_metrics):
         # this relies on the assumption there will only be one face detected
+        fid = next(iter(gaze_metrics.keys()))
         gaze_metric = next(iter(gaze_metrics.values()))
         draw_gaze_region(frame, gaze_metric)
-        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(0, bounding_box_dict)
+
+        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, bounding_box_dict)
 
         global TIME_OF_LAST_EYE_OPEN
         curr_timestamp = time.time()
