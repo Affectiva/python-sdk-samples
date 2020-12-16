@@ -1,5 +1,6 @@
 import signal
 import time 
+import math
 import cv2
 import TIS
 
@@ -136,6 +137,7 @@ def tcam_process_face_input(detector, tis, start_time, output_file, out, logo, a
 
 def get_object_input_results(object_listener, frame):
     object_listener.mutex.acquire()
+
     objects = object_listener.objects.copy()
     bounding_box_dict = object_listener.bounding_box.copy()
     type_dict = object_listener.type.copy()
@@ -157,6 +159,42 @@ def get_body_input_results(body_listener, frame):
 
     if len(bodies) > 0:
         draw_bodies(frame, {"body_points": body_points_dict})
+
+def get_cellphone_in_hand_results(object_listener, body_listener, frame):
+    object_listener.mutex.acquire()
+    obj_bounding_box_dict = object_listener.bounding_box.copy()
+    obj_type_dict = object_listener.type.copy()
+    object_listener.mutex.release()
+
+    body_listener.mutex.acquire()
+    body_points_dict = body_listener.bodyPoints.copy()
+    body_listener.mutex.release()
+
+    pix_threshold = 170 # ????
+
+    for oid in obj_type_dict.keys():
+        obj_type = obj_type_dict[oid].name
+        if "phone" in obj_type:
+            tx, ty, bx, by = get_bounding_box_points(oid, obj_bounding_box_dict)
+            phone_center = [(tx + bx) / 2, (ty + by) / 2]
+
+            # this should only include driver
+            for body in body_points_dict.values():
+                distances_list = []
+                body_point_keys = body.keys()
+                for key in body_point_keys:
+                    body_pt_x, body_pt_y = body[key]
+                    distance_to_phone = math.sqrt(math.pow(body_pt_x - phone_center[0], 2) + math.pow(body_pt_y - phone_center[1], 2))
+                    distances_list.append(distance_to_phone)
+
+                if min(distances_list) < pix_threshold:
+                    cv2.rectangle(frame, (1568, 488), (1802, 552), (50, 50, 50), -1)
+                    cv2.rectangle(frame, (1570, 490), (1800, 550), (0, 0, 0), -1)
+                    cv2.putText(frame, "Cellphone in hand", (1587, 525),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7,
+                                (255, 255, 255), 1, cv2.LINE_AA)
+
 
 
 def tcam_process_object_input(detector, tis, start_time, output_file, out, logo, args):
@@ -187,6 +225,7 @@ def tcam_process_object_input(detector, tis, start_time, output_file, out, logo,
                 draw_affectiva_logo(frame, logo, frame.shape[1], frame.shape[0])
                 get_object_input_results(object_listener, frame)
                 get_body_input_results(body_listener, frame)
+                get_cellphone_in_hand_results(object_listener, body_listener, frame)
                 cv2.imshow('Processed Frame', frame)
 
             if output_file is not None:
