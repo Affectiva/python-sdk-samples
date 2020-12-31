@@ -247,6 +247,14 @@ def draw_occupants(frame, listener_metrics):
             upper_left_y -= LINE_HEIGHT
             display_top_metrics("occupant_id", occid, upper_left_x, upper_left_y, frame)
             upper_left_y -= LINE_HEIGHT
+            face_id = listener_metrics["face_id"][occid]
+            face_id = 'n/a' if face_id == 'nan' else face_id
+            display_top_metrics("face_id", face_id, upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
+            body_id = listener_metrics["body_id"][occid]
+            body_id = 'n/a' if body_id == 'nan' else body_id
+            display_top_metrics("body_id", body_id, upper_left_x, upper_left_y, frame)
+            upper_left_y -= LINE_HEIGHT
             draw_bodies(frame, listener_metrics)
 
 def draw_bodies(frame, listener_metrics):

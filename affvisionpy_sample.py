@@ -41,7 +41,7 @@ HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRig
 HEADER_ROW_OBJECTS = ['TimeStamp', 'objectId', 'confidence', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY',
                       'ObjectType']
 
-HEADER_ROW_OCCUPANTS = ['TimeStamp', 'occupantId', 'bodyId', 'confidence', 'regionId', 'regionType', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY']
+HEADER_ROW_OCCUPANTS = ['TimeStamp', 'occupantId', 'bodyId', 'faceId',  'confidence', 'regionId', 'regionType', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY']
 
 HEADER_ROW_BODIES = ['TimeStamp', 'bodyId']
 header_row = []
@@ -370,6 +370,7 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
                 region_type_dict = listener.regionType.copy()
                 body_id_dict = listener.bodyId.copy()
                 body_points_dict = listener.bodyPoints.copy()
+                face_id_dict = listener.faceId.copy()
                 listener.mutex.release()
 
                 listener_metrics = {
@@ -379,7 +380,8 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
                     "region": region_dict,
                     "region_type": region_type_dict,
                     "body_id": body_id_dict,
-                    "body_points": body_points_dict
+                    "body_points": body_points_dict,
+                    "face_id": face_id_dict
                 }
 
                 write_occupant_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
@@ -578,6 +580,7 @@ def write_occupant_metrics_to_csv_data_list(csv_data, timestamp, listener_metric
             current_frame_data["regionId"] = listener_metrics["region_id"][occ_id]
             current_frame_data["regionType"] = listener_metrics["region_type"][occ_id]
             current_frame_data["bodyId"] = listener_metrics["body_id"][occ_id]
+            current_frame_data["faceId"] = listener_metrics["face_id"][occ_id]
             csv_data.append(current_frame_data)
             current_frame_data = {}
     else:
