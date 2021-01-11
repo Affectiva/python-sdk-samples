@@ -10,7 +10,7 @@ import cv2
 import math
 import numpy as np
 import json
-import TIS
+# import TIS
 
 from body_listener import BODY_POINTS
 from face_listener import FaceListener as ImageListener

@@ -45,8 +45,13 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         #     upper_left_y += LINE_HEIGHT
 
         for key, val in emotions.items():
-            if key.name == 'joy' or key.name == 'anger' or key.name == 'surprise' or key.name == 'neutral':
-                display_left_metric(key.name, val, upper_left_x, upper_left_y, frame)
+            try:
+                key_name = key.name
+            except AttributeError:
+                key_name = key
+
+            if key_name == 'joy' or key_name == 'anger' or key_name == 'surprise' or key_name == 'neutral':
+                display_left_metric(key_name, val, upper_left_x, upper_left_y, frame)
                 upper_left_y += LINE_HEIGHT
 
         # display_gaze(frame, gaze_metric.gaze_region.name, upper_left_x, upper_left_y)
@@ -66,10 +71,15 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
         #     upper_left_y += LINE_HEIGHT
 
         for key, val in expressions.items():
-            if ("blink_rate" in key.name) or ("blink" in key.name):
+            try:
+                key_name = key.name
+            except AttributeError:
+                key_name = key
+
+            if ("blink_rate" in key_name) or ("blink" in key_name):
                 continue
             
-            display_expression(key.name, val, upper_right_x, upper_right_y, frame)
+            display_expression(key_name, val, upper_right_x, upper_right_y, frame)
             upper_right_y += LINE_HEIGHT
 
         # draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y)
@@ -349,20 +359,21 @@ def draw_bounding_box(frame, listener_metrics, show_emotion):
         emotion_value_threshold = 5
         for fid in listener_metrics["bounding_box"].keys():
             upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
-            for key in listener_metrics["emotions"][fid]:
-                if 'valence' in str(key):
-                    valence_value = listener_metrics["emotions"][fid][key]
-                if 'anger' in str(key):
-                    anger_value = listener_metrics["emotions"][fid][key]
-                if 'joy' in str(key):
-                    joy_value = listener_metrics["emotions"][fid][key]
-
-            if valence_value < 0 and anger_value >= emotion_value_threshold:
-                cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 0, 255), 3)
-            elif valence_value >= emotion_value_threshold and joy_value >= emotion_value_threshold:
-                cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 255, 0), 3)
-            else:
-                cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (21, 169, 167), 3)
+            if fid in listener_metrics["emotions"]:
+                for key in listener_metrics["emotions"][fid]:
+                    if 'valence' in str(key):
+                        valence_value = listener_metrics["emotions"][fid][key]
+                    if 'anger' in str(key):
+                        anger_value = listener_metrics["emotions"][fid][key]
+                    if 'joy' in str(key):
+                        joy_value = listener_metrics["emotions"][fid][key]
+                
+                if valence_value < 0 and anger_value >= emotion_value_threshold:
+                    cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 0, 255), 3)
+                elif valence_value >= emotion_value_threshold and joy_value >= emotion_value_threshold:
+                    cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 255, 0), 3)
+                else:
+                    cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (21, 169, 167), 3)
     else:
         for fid in listener_metrics["bounding_box"].keys():
             upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
