@@ -2,7 +2,7 @@ import signal
 import time 
 import math
 import cv2
-import TIS
+# import TIS
 
 import numpy as np
 import affvisionpy as af
@@ -162,6 +162,38 @@ def get_body_input_results(body_listener, frame):
     if len(bodies) > 0:
         draw_bodies(frame, {"body_points": body_points_dict})
 
+def get_cellphone_in_hand_results_from_metrics(listener_metrics, frame):
+    print("get_cellphone_in_hand_results_from_metrics")
+    obj_bounding_box_dict = listener_metrics["objects"]["bounding_box"]
+    obj_type_dict = listener_metrics["objects"]["type"]
+
+    body_points_dict = listener_metrics["body_points"]
+
+    pix_threshold = 170 # ????
+
+    for oid in obj_type_dict.keys():
+        obj_type = obj_type_dict[oid]
+        if "phone" in obj_type:
+            tx, ty, bx, by = get_bounding_box_points(oid, obj_bounding_box_dict)
+            phone_center = [(tx + bx) / 2, (ty + by) / 2]
+
+            # this should only include driver
+            for body in body_points_dict.values():
+                distances_list = []
+                body_point_keys = body.keys()
+                for key in body_point_keys:
+                    body_pt_x, body_pt_y = body[key]
+                    distance_to_phone = math.sqrt(math.pow(body_pt_x - phone_center[0], 2) + math.pow(body_pt_y - phone_center[1], 2))
+                    distances_list.append(distance_to_phone)
+
+                if min(distances_list) < pix_threshold:
+                    cv2.rectangle(frame, (1568, 488), (1802, 552), (50, 50, 50), -1)
+                    cv2.rectangle(frame, (1570, 490), (1800, 550), (0, 0, 0), -1)
+                    cv2.putText(frame, "Cellphone in hand", (1587, 525),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7,
+                                (255, 255, 255), 1, cv2.LINE_AA)
+
 def get_cellphone_in_hand_results(object_listener, body_listener, frame):
     object_listener.mutex.acquire()
     obj_bounding_box_dict = object_listener.bounding_box.copy()
@@ -278,6 +310,38 @@ def tcam_process_occupant_bkp_input(detector, tis, start_time, output_file, out,
     print("Gracefully killing tcam stuff")
     detector.stop()
 
+def get_gaze_input_results_from_metrics(listener_metrics, frame):
+    global TIME_OF_LAST_DISTRACTION_POLL, TIME_OF_LAST_EYE_OPEN, EYES_ON_ROAD
+    gaze_metrics = listener_metrics['gaze']
+    bounding_box_dict = listener_metrics['bounding_box']
+
+    if len(gaze_metrics):
+        # this relies on the assumption there will only be one face detected
+        fid = next(iter(gaze_metrics.keys()))
+        gaze_metric = next(iter(gaze_metrics.values()))
+        draw_gaze_region(frame, gaze_metric)
+
+        upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, bounding_box_dict)
+        curr_timestamp = time.time()
+        try:
+            gaze_idx = int(gaze_metric.gaze_region)
+        except AttributeError:
+            gaze_idx = gaze_metric
+
+        if gaze_idx is 0:
+            eyes_closed_prolonged = (curr_timestamp - TIME_OF_LAST_EYE_OPEN) > 1
+        else:
+            eyes_closed_prolonged = False
+            TIME_OF_LAST_EYE_OPEN = curr_timestamp
+
+        # if gazing in the correct region, or if region is unknown but BRIEFLY
+        eyes_on_road = (gaze_idx == 1) or (gaze_idx == 0 and not eyes_closed_prolonged)
+
+        if (curr_timestamp - TIME_OF_LAST_DISTRACTION_POLL) > 1 or eyes_on_road:
+            EYES_ON_ROAD = eyes_on_road
+            TIME_OF_LAST_DISTRACTION_POLL = curr_timestamp
+
+        display_distraction(frame, EYES_ON_ROAD, upper_left_x, upper_left_y)
 
 def get_gaze_input_results(face_listener, frame):
     global TIME_OF_LAST_DISTRACTION_POLL, TIME_OF_LAST_EYE_OPEN, EYES_ON_ROAD

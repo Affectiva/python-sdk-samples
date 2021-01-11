@@ -180,7 +180,11 @@ def draw_objects(frame, listener_metrics):
             upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(oid, listener_metrics[
                 "bounding_box"])
 
-            obj_type = listener_metrics["object_type"][oid].name
+            try:
+                obj_type = listener_metrics["object_type"][oid].name
+            except AttributeError:
+                obj_type = listener_metrics["object_type"][oid]
+
             # default color == GRAY
             color = (128, 128, 128)
             if "phone" in obj_type:
@@ -336,11 +340,20 @@ def get_face_landmark_points(fid, face_landmark_points_dict):
     * landmark_points: Array[float]
         outer_right_eye, outer_left_eye, nose_tip, chin_tip
     """
+    if af.FacePoint.outer_right_eye in face_landmark_points_dict[fid]:
 
-    return [face_landmark_points_dict[fid][af.FacePoint.outer_right_eye],
-    face_landmark_points_dict[fid][af.FacePoint.outer_left_eye],
-    face_landmark_points_dict[fid][af.FacePoint.nose_tip],
-    face_landmark_points_dict[fid][af.FacePoint.chin_tip]]
+        return [face_landmark_points_dict[fid][af.FacePoint.outer_right_eye],
+        face_landmark_points_dict[fid][af.FacePoint.outer_left_eye],
+        face_landmark_points_dict[fid][af.FacePoint.nose_tip],
+        face_landmark_points_dict[fid][af.FacePoint.chin_tip]]
+
+    else:
+        outer_rt_eye_pt = af.Point(face_landmark_points_dict[fid]["outer_right_eye"][0], face_landmark_points_dict[fid]["outer_right_eye"][1])
+        outer_lf_eye_pt = af.Point(face_landmark_points_dict[fid]["outer_left_eye"][0], face_landmark_points_dict[fid]["outer_left_eye"][1])
+        nose_tip_pt = af.Point(face_landmark_points_dict[fid]["nose_tip"][0], face_landmark_points_dict[fid]["nose_tip"][1])
+        chin_tip_pt = af.Point(face_landmark_points_dict[fid]["chin_tip"][0], face_landmark_points_dict[fid]["chin_tip"][1])
+
+        return [outer_rt_eye_pt, outer_lf_eye_pt, nose_tip_pt, chin_tip_pt]
 
 def draw_bounding_box(frame, listener_metrics, show_emotion):
     """
@@ -378,6 +391,31 @@ def draw_bounding_box(frame, listener_metrics, show_emotion):
         for fid in listener_metrics["bounding_box"].keys():
             upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
             cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (21, 169, 167), 3)
+
+def draw_drowsiness(frame, bounding_box_dict, drowsiness_dict, expressions_dict, glasses_dict):
+    height = 1080
+    width = 1920
+
+    if len(expressions_dict) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
+        draw_bounding_box(frame, {"bounding_box": bounding_box_dict}, False)
+        for fid in expressions_dict:
+            upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, bounding_box_dict)
+            box_width = lower_right_x - upper_left_x
+            upper_right_x = upper_left_x + box_width
+            upper_right_y = upper_left_y
+            if (len(drowsiness_dict[fid]) == 2):
+                display_drowsiness(frame, drowsiness_dict[fid][0], upper_left_x, upper_left_y)
+                upper_left_y += 25
+                display_left_metric("drowsiness confidence", drowsiness_dict[fid][1], upper_left_x, upper_left_y, frame)
+                upper_left_y += 25
+            
+            display_expression("eye_closure", expressions_dict[fid][af.Expression.eye_closure.name], upper_right_x, upper_right_y, frame)
+            upper_right_y += 25
+            
+            display_expression("yawn", expressions_dict[fid][af.Expression.yawn.name], upper_right_x, upper_right_y, frame)
+            upper_right_y += 25
+            # display_expression("glasses", glasses_dict[fid], upper_right_x, upper_right_y, frame)
+            # upper_right_y += 25
 
 def draw_and_calculate_3d_pose(frame, camera_matrix, camera_type, dist_coefficients, listener_metrics):
     """
@@ -509,7 +547,11 @@ def display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y):
     draw_outlined_text(frame, key_name, abs(upper_left_x - key_text_width - LEFT_METRIC_OFFSET), upper_left_y)
 
     text_color = (255,255,255)
-    val_text = drowsiness_metric.drowsiness.name
+    try:
+        val_text = drowsiness_metric.drowsiness.name
+    except AttributeError:
+        val_text = drowsiness_metric
+
     if val_text == "asleep":
         text_color = (51, 87, 255)
     elif val_text == "severe":
@@ -517,7 +559,7 @@ def display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y):
     elif val_text == "moderate":
         text_color = (0, 204, 255)
         
-    draw_outlined_text(frame, drowsiness_metric.drowsiness.name, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y, text_color)
+    draw_outlined_text(frame, val_text, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y, text_color)
 
 def display_measurements(key_name, val, upper_left_y, frame, x1):
     """
@@ -681,7 +723,10 @@ def draw_affectiva_logo(frame, logo, width, height):
         frame[y1:y2, x1:x2, c] = color + beta
 
 def draw_gaze_region(frame, gaze_metric):
-    idx = int(gaze_metric.gaze_region)
+    try:
+        idx = int(gaze_metric.gaze_region)
+    except AttributeError:
+        idx = gaze_metric
 
     height = frame.shape[0]
 
