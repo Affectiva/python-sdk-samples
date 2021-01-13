@@ -12,6 +12,8 @@ LEFT_METRIC_OFFSET = 105
 LINE_HEIGHT = 25
 
 IMAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
+DEFAULT_ALPHA = 0.75
+
 
 def draw_metrics(frame, listener_metrics, identity_names_dict):
     """
@@ -85,6 +87,7 @@ def draw_metrics(frame, listener_metrics, identity_names_dict):
 
         draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y)
 
+
 def draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y):
     age = round(age_metric.age)
     age = 'unknown' if age == -1 else age
@@ -102,6 +105,7 @@ def draw_age(frame, age_metric, age_category, upper_right_x, upper_right_y):
     draw_outlined_text(frame, age_category, upper_right_x + 10, upper_right_y)
     draw_outlined_text(frame, " :age_category", upper_right_x + LEFT_METRIC_OFFSET, upper_right_y)
     upper_right_y += LINE_HEIGHT
+
 
 def draw_outlined_text(frame, text, x1, y1):
     """
@@ -126,6 +130,7 @@ def draw_outlined_text(frame, text, x1, y1):
                 cv2.FONT_HERSHEY_DUPLEX,
                 TEXT_SIZE,
                 (255, 255, 255), 1, cv2.LINE_AA)
+
 
 def draw_metric_rects(frame, metric_key, metric_val, x1, y1):
     """
@@ -162,6 +167,7 @@ def draw_metric_rects(frame, metric_key, metric_val, x1, y1):
         cv2.rectangle(frame, (x1, y1), (x1 + rect_width, y1 - rect_height), c, -1)
 
         x1 += 10
+
 
 def draw_objects(frame, listener_metrics):
     """
@@ -212,6 +218,7 @@ def draw_objects(frame, listener_metrics):
             display_top_metrics("region_id " + region_id, region_type, upper_left_x, upper_left_y, frame)
             upper_left_y -= LINE_HEIGHT
 
+
 def draw_occupants(frame, listener_metrics):
     """
     draw occupants with its bounding box on screen
@@ -257,6 +264,7 @@ def draw_occupants(frame, listener_metrics):
             upper_left_y -= LINE_HEIGHT
             draw_bodies(frame, listener_metrics)
 
+
 def draw_bodies(frame, listener_metrics):
     """
     draw bodies points with edges on screen
@@ -279,6 +287,7 @@ def draw_bodies(frame, listener_metrics):
                     start = body_point[edge[0]]
                     end = body_point[edge[1]]
                     cv2.line(frame, (start[0], start[1]), (end[0], end[1]), COLORS[edge_order], 3)
+
 
 def display_top_metrics(key_name, val, upper_left_x, upper_left_y, frame):
     """
@@ -310,11 +319,13 @@ def display_top_metrics(key_name, val, upper_left_x, upper_left_y, frame):
     else:
         draw_outlined_text(frame, str(val), upper_left_x + text_width, upper_left_y)
 
+
 def draw_polygon(points, frame, color):
     pts = []
     for pt in points:
         pts.append([int(pt.x), int(pt.y)])
     cv2.polylines(frame, [np.array(pts)], True, color, 3)
+
 
 def get_bounding_box_points(fid, bounding_box_dict):
     """
@@ -338,6 +349,7 @@ def get_bounding_box_points(fid, bounding_box_dict):
             int(bounding_box_dict[fid][2]),
             int(bounding_box_dict[fid][3]))
 
+
 def draw_bounding_box(frame, listener_metrics):
     """
     For each frame, draw the bounding box on screen.
@@ -353,21 +365,31 @@ def draw_bounding_box(frame, listener_metrics):
     """
     emotion_value_threshold = 5
     for fid in listener_metrics["bounding_box"].keys():
+        valence_value = anger_value = joy_value = 0
         upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
         for key in listener_metrics["emotions"][fid]:
-            if 'valence' in str(key):
-                valence_value = listener_metrics["emotions"][fid][key]
-            if 'anger' in str(key):
-                anger_value = listener_metrics["emotions"][fid][key]
-            if 'joy' in str(key):
-                joy_value = listener_metrics["emotions"][fid][key]
+            valence_value = listener_metrics["emotions"][fid][key] if 'valence' in str(key) else 0
+            anger_value = listener_metrics["emotions"][fid][key] if 'anger' in str(key) else 0
+            joy_value = listener_metrics["emotions"][fid][key] if 'joy' in str(key) else 0
 
+        color = (21, 169, 167)  # default color
+        thickness = 3
         if valence_value < 0 and anger_value >= emotion_value_threshold:
-            cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 0, 255), 3)
+            color = (0, 0, 255)
         elif valence_value >= emotion_value_threshold and joy_value >= emotion_value_threshold:
-            cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (0, 255, 0), 3)
-        else:
-            cv2.rectangle(frame, (upper_left_x, upper_left_y), (lower_right_x, lower_right_y), (21, 169, 167), 3)
+            color = (0, 255, 0)
+
+        # get ROI of the bounding box (to avoid copying the whole image)
+        roi_original = frame[upper_left_y:lower_right_y, upper_left_x:lower_right_x]
+        roi_overlay = roi_original.copy()
+
+        # draw rectangle on the overlay. note: coordinates are relative to the copy (small) image
+        width = lower_right_x - upper_left_x
+        height = lower_right_y - upper_left_y
+        cv2.rectangle(roi_overlay, (0, 0), (width, height), color, thickness)
+
+        cv2.addWeighted(src1=roi_overlay, alpha=DEFAULT_ALPHA, src2=roi_original, beta=1-DEFAULT_ALPHA, gamma=0, dst=roi_original)
+
 
 def get_text_size(text, font, thickness):
     """
@@ -390,6 +412,7 @@ def get_text_size(text, font, thickness):
     text_size = cv2.getTextSize(text, font, TEXT_SIZE, thickness)
     return text_size[0][0], text_size[0][1]
 
+
 def display_gaze(frame, gaze_region_name, upper_left_x, upper_left_y):
     """
     Display gaze on screen to the left of the bounding box
@@ -408,6 +431,7 @@ def display_gaze(frame, gaze_region_name, upper_left_x, upper_left_y):
     gaze_text_size = 132  # this was precalculated
     draw_outlined_text(frame, "gaze_region: ", abs(upper_left_x - gaze_text_size - LEFT_METRIC_OFFSET), upper_left_y)
     draw_outlined_text(frame, gaze_region_name, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y)
+
 
 def display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y):
     """
@@ -429,6 +453,7 @@ def display_drowsiness(frame, drowsiness_metric, upper_left_x, upper_left_y):
     key_text_width, key_text_height = get_text_size(key_name, cv2.FONT_HERSHEY_SIMPLEX, 1)
     draw_outlined_text(frame, key_name, abs(upper_left_x - key_text_width - LEFT_METRIC_OFFSET), upper_left_y)
     draw_outlined_text(frame, drowsiness_metric.drowsiness.name, abs(upper_left_x - LEFT_METRIC_OFFSET), upper_left_y)
+
 
 def display_measurements(key_name, val, upper_left_y, frame, x1):
     """
@@ -459,6 +484,7 @@ def display_measurements(key_name, val, upper_left_y, frame, x1):
 
     draw_outlined_text(frame, key_name + ": ", abs(x1 - key_val_width - PADDING_FOR_SEPARATOR), upper_left_y)
     draw_outlined_text(frame, val_text, abs(x1 - val_text_width), upper_left_y)
+
 
 def display_left_metric(key_name, val, upper_left_x, upper_left_y, frame):
     """
@@ -491,6 +517,7 @@ def display_left_metric(key_name, val, upper_left_x, upper_left_y, frame):
 
     draw_metric_rects(frame, key_name, val, abs(upper_left_x - total_rect_width), upper_left_y)
 
+
 def display_expression(key_name, val, upper_right_x, upper_right_y, frame):
     """
     Display an expression metric on screen, showing the name next to a horizontal segmented bar representing the value
@@ -521,6 +548,7 @@ def display_expression(key_name, val, upper_right_x, upper_right_y, frame):
 
     draw_outlined_text(frame, " :" + key_name, upper_right_x + LEFT_METRIC_OFFSET, upper_right_y)
 
+
 def display_identity(frame, identity, upper_left_y, upper_left_x, identity_names_dict):
     """
         Display the face identity metrics on screen.
@@ -548,6 +576,7 @@ def display_identity(frame, identity, upper_left_y, upper_left_x, identity_names
     cv2.putText(frame, id_name, (upper_left_x, upper_left_y - 10), cv2.FONT_HERSHEY_DUPLEX, TEXT_SIZE, (255, 255, 255),
                 1, cv2.LINE_AA)
 
+
 def get_affectiva_logo(frame_width, frame_height):
     """
     Return the properly sized logo for the given sized frame
@@ -564,6 +593,7 @@ def get_affectiva_logo(frame_width, frame_height):
     logo_height = int(frame_height / 10)
     logo = cv2.resize(logo, (logo_width, logo_height))
     return logo
+
 
 def draw_affectiva_logo(frame, logo, width, height):
     """
@@ -591,6 +621,7 @@ def draw_affectiva_logo(frame, logo, width, height):
         beta = frame[y1:y2, x1:x2, c] * (alpha)
         frame[y1:y2, x1:x2, c] = color + beta
 
+
 def draw_gaze_region(frame, gaze_metric):
     idx = int(gaze_metric.gaze_region)
 
@@ -616,6 +647,7 @@ def draw_gaze_region(frame, gaze_metric):
 
     for c in range(0, 3):
         frame[y1:y2, x1:x2, c] = (alpha * img[:, :, c] + alpha_frame * frame[y1:y2, x1:x2, c])
+
 
 def check_bounding_box_outside(width, height, bounding_box_dict):
     """
