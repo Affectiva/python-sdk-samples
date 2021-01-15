@@ -3,6 +3,7 @@ import cv2
 import os
 import math
 import numpy as np
+from affvisionpy import Emotion
 
 from body_listener import EDGES, COLORS
 
@@ -365,12 +366,11 @@ def draw_bounding_box(frame, listener_metrics):
     """
     emotion_value_threshold = 5
     for fid in listener_metrics["bounding_box"].keys():
-        valence_value = anger_value = joy_value = 0
         upper_left_x, upper_left_y, lower_right_x, lower_right_y = get_bounding_box_points(fid, listener_metrics["bounding_box"])
-        for key in listener_metrics["emotions"][fid]:
-            valence_value = listener_metrics["emotions"][fid][key] if 'valence' in str(key) else 0
-            anger_value = listener_metrics["emotions"][fid][key] if 'anger' in str(key) else 0
-            joy_value = listener_metrics["emotions"][fid][key] if 'joy' in str(key) else 0
+        emotions = listener_metrics["emotions"][fid]
+        valence_value = emotions[Emotion.valence] if Emotion.valence in emotions else 0
+        anger_value = emotions[Emotion.anger] if Emotion.anger in emotions else 0
+        joy_value = emotions[Emotion.joy] if Emotion.joy in emotions else 0
 
         color = (21, 169, 167)  # default color
         thickness = 3
