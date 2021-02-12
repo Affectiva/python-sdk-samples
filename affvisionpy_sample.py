@@ -23,7 +23,7 @@ from display_metrics import (draw_metrics, check_bounding_box_outside, draw_boun
                              get_affectiva_logo, get_bounding_box_points, draw_objects, draw_occupants, draw_bodies,
                              draw_and_calculate_3d_pose)
 from tcam_utils import (tcam_process_face_input, tcam_process_object_input, tcam_process_occupant_bkp_input, 
-                        tcam_process_gaze_input, tcam_process_drowsiness_input)
+                        tcam_process_gaze_input, tcam_process_drowsiness_input, get_gaze_input_results, get_face_bbox_input_results, get_3d_pose_input_results)
 
 
 # Constants
@@ -171,7 +171,7 @@ def run(csv_data):
         elif args.show_occupants_c:
             process_occupant_bkp_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
         elif args.show_gaze_c:
-            print("gaze is not implemented for non-fisheyes")
+            process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients)
         elif args.show_drowsiness_c:
             print("drowsiness is not implemented for non-fisheyes")
 
@@ -274,13 +274,10 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
 
     detector.stop()
 
-def process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
-    # TODO: this is just a base structure to get started @lindsay
+def process_gaze_input(detector, capture_file, input_file, start_time, output_file, out, logo, args, camera_matrix, dist_coefficients, camera_type="fisheye"):
     count = 0
     last_timestamp = 0
-
-    features = {af.Feature.measurements, af.Feature.gaze}
-
+    features = {af.Feature.faces, af.Feature.gaze}
     detector.enable_features(features)
 
     listener = ImageListener()
@@ -289,8 +286,9 @@ def process_gaze_input(detector, capture_file, input_file, start_time, output_fi
     detector.start()
 
     while capture_file.isOpened():
-        # Capture frame-by-frame
+    # Capture frame-by-frame
         ret, frame = capture_file.read()
+        frame = cv2.flip(frame, 1)
 
         if ret:
 
@@ -312,40 +310,23 @@ def process_gaze_input(detector, capture_file, input_file, start_time, output_fi
                 except Exception as exp:
                     print(exp)
 
-                listener.mutex.acquire()
-
-                faces = listener.faces.copy()
-                # measurements_dict = listener.measurements_dict.copy()
-                bounding_box_dict = listener.bounding_box_dict.copy()
-                # gaze_metric_dict = listener.gaze_metric_dict.copy()
-                # glasses_dict = listener.glasses_dict.copy()
-                # age_metric_dict = listener.age_metric_dict.copy()
-                # age_category_dict = listener.age_category_dict.copy()
-
-                listener.mutex.release()
-
-                listener_metrics = {
-                    "bounding_box": bounding_box_dict
-                }
-
-                draw_affectiva_logo(frame, logo, width, height)
-                if len(faces) > 0 and not check_bounding_box_outside(width, height, bounding_box_dict):
-                    draw_bounding_box(frame, listener_metrics, True)
-                    draw_metrics(frame, listener_metrics, identity_names_dict)
-
                 if not args.no_draw:
+                    draw_affectiva_logo(frame, logo, frame.shape[1], frame.shape[0])
+                    get_gaze_input_results(listener, frame)
+                    get_face_bbox_input_results(listener, frame)
+                    get_3d_pose_input_results(listener, frame, camera_matrix, camera_type, dist_coefficients)
                     cv2.imshow('Processed Frame', frame)
 
                 if output_file is not None:
                     out.write(frame)
 
                 if cv2.waitKey(1) == 27:
-                    break
+                    break;
             else:
                 print("skipped a frame due to the timestamp not incrementing - old timestamp %f, current timestamp %f" %
-                      (last_timestamp, curr_timestamp))
+                    (last_timestamp, curr_timestamp))
         else:
-            break
+            break;
 
     detector.stop()
 
@@ -433,7 +414,7 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
     count = 0
     last_timestamp = 0
 
-    detector.enable_features({af.Feature.phones, af.Feature.child_seats, af.Feature.bodies})
+    detector.enable_features({af.Feature.phones, af.Feature.bodies})
 
     # callback interval
     object_listener = ObjectListener(OBJECT_CALLBACK_INTERVAL)
