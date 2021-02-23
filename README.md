@@ -1,4 +1,4 @@
-# Sample Python App for Affectiva Automotive AI SDK #
+# Sample Python App for Affectiva Emotion SDK 5.0 #
 
 This script demonstrates how to use Affectiva's affvisionpy module to process frames from either a webcam or a video file. It supports displaying the input frames on screen, overlaid with metric values, and can also write the metric values to an output CSV file as well as a video AVI file.
 
@@ -43,10 +43,6 @@ Run the script with the default webcam, limiting face detection to 1 face
     
     python3 affvisionpy_sample.py -d </path/to/data/dir> -n 1
 
-Run the script with the default webcam and with the identity feature enabled.
-        
-    python3 affvisionpy_sample.py -d </path/to/data/dir> --face_id
-
 Run the script with a 2nd webcam
     
     python3 affvisionpy_sample.py -d </path/to/data/dir> -c 1
@@ -68,9 +64,3 @@ For both video and webcam options, the script displays real-time metrics on the 
 
 For the video option, the synchronous version of affvisionpy's FrameDetector will be used (SyncFrameDetector). 
 For the webcam option, the asynchronous version will be used (FrameDetector).
-
-Sample now supports Object and Occupant detection can be used with --object and --occupant respectively. If nothing is passed then Face detection is turned ON automatically.
-
-#### Eye gaze:
-
-We currently don't have a way to identify the driver, hence we are assuming the driver is the first face from the returned faces dictionary and visualizing its gaze region
