@@ -74,11 +74,14 @@ def run(csv_data):
         parser, args)
 
     start_time = 0
+
+    baseline_mode = af.BaselineMode.ON if args.baseline_mode is True else af.BaselineMode.OFF 
+
     if isinstance(input_file, int):
         start_time = time.time()
-        detector = af.FrameDetector(data_dir, max_num_faces=max_num_of_faces)
+        detector = af.FrameDetector(data_dir, baseline_mode, max_num_faces=max_num_of_faces)
     else:
-        detector = af.SyncFrameDetector(data_dir, max_num_of_faces)
+        detector = af.SyncFrameDetector(data_dir, baseline_mode, max_num_of_faces)
 
     fps = 30
     if args.video:
@@ -299,6 +302,7 @@ def parse_command_line():
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1920, 1080],
                         help="resolution in pixels (2-values): width height")
     parser.add_argument("--no-draw", dest="no_draw", action='store_true', help="Don't draw window while processing video, default is set to False")
+    parser.add_argument("--baseline_mode", dest="baseline_mode", required=False, default=True)
     args = parser.parse_args()
     return parser, args
 
