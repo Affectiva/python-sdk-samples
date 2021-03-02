@@ -175,7 +175,7 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                     "measurements": measurements_dict,
                     "expressions": expressions_dict,
                     "emotions": emotions_dict,
-                    "bounding_box": bounding_box_dict,
+                    "bounding_box": bounding_box_dict
                 }
 
                 write_face_metrics_to_csv_data_list(csv_data, round(curr_timestamp, 0), listener_metrics)
@@ -265,7 +265,9 @@ def write_csv_data_to_file(csv_data, csv_file):
     if ".csv" not in csv_file:
         csv_file = csv_file + ".csv"
     with open(csv_file, 'w') as c_file:
-        writer = csv.DictWriter(c_file, fieldnames=header_row)
+        # When writing a row, restval is the default value when it isn't in the dict row.
+        # extrasaction='ignore' prevents complaining if all columns are not present in dict row
+        writer = csv.DictWriter(c_file, fieldnames=header_row, restval='o', extrasaction='ignore')
         writer.writeheader()
         for row in csv_data:
             writer.writerow(row)
