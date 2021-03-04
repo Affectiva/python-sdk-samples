@@ -209,7 +209,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 if output_file is not None:
                     out.write(frame)
 
-                if cv2.waitKey(1) == 27:
+                waitkey_delay = 1 if is_input_a_video(input_file) else 0
+                if cv2.waitKey(waitkey_delay) == 27:
                     break
             else:
                 print("skipped a frame due to the timestamp not incrementing - old timestamp %f, current timestamp %f" %
