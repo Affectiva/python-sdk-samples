@@ -83,7 +83,7 @@ def run(csv_data):
                                     af.BaselineMode.ON if baseline_mode else af.BaselineMode.OFF, 
                                     max_num_faces=max_num_of_faces)
     else:
-        baseline_mode = args.baseline_mode if args.baseline_mode is not None else is_input_a_video(input_file)
+        baseline_mode = args.baseline_mode if args.baseline_mode is not None else is_input_file_a_video(input_file)
         detector = af.SyncFrameDetector(data_dir, 
                                         af.BaselineMode.ON if baseline_mode else af.BaselineMode.OFF, 
                                         max_num_faces=max_num_of_faces)
@@ -133,7 +133,7 @@ def run(csv_data):
         if not csv_file == DEFAULT_FILE_NAME:
             write_csv_data_to_file(csv_data, csv_file)
 
-def is_input_a_video(input_file):
+def is_input_file_a_video(input_file):
     capture_file = cv2.VideoCapture(input_file)
     if capture_file.isOpened():
         # if we successfully read two frames from this file, we can assume it is a video (as opposed to an image)
@@ -163,7 +163,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
 
             height = frame.shape[0]
             width = frame.shape[1]
-            if isinstance(input_file, int):
+            # if the input is a webcam, or a photo
+            if isinstance(input_file, int) or not is_input_file_a_video(input_file):
                 curr_timestamp = (time.time() - start_time) * 1000.0
             else:
                 curr_timestamp = int(capture_file.get(cv2.CAP_PROP_POS_MSEC))
@@ -209,7 +210,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 if output_file is not None:
                     out.write(frame)
 
-                waitkey_delay = 1 if is_input_a_video(input_file) else 0
+                # wait for user input only if the input file is a photo
+                waitkey_delay = 1 if isinstance(input_file, int) or is_input_file_a_video(input_file) else 0
                 if cv2.waitKey(waitkey_delay) == 27:
                     break
             else:
