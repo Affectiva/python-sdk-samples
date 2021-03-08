@@ -27,7 +27,8 @@ HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRig
                     'neutral', 'contempt', 'smile',
                     'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure',
                     'cheek_raise', 'lid_tighten', 'yawn',
-                    'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor'
+                    'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor',
+                    'attention', 'jaw_drop', 'smirk', 'chain_raise', 'engagement', 'lip_pucker', 'dimpler', 'lip_stretch', 'lip_press', 'lip_suck'
                     ]
 
 header_row = []
@@ -74,11 +75,18 @@ def run(csv_data):
         parser, args)
 
     start_time = 0
+
     if isinstance(input_file, int):
         start_time = time.time()
-        detector = af.FrameDetector(data_dir, max_num_faces=max_num_of_faces)
+        baseline_mode = args.baseline_mode if args.baseline_mode is not None else True
+        detector = af.FrameDetector(data_dir, 
+                                    af.BaselineMode.ON if baseline_mode else af.BaselineMode.OFF, 
+                                    max_num_faces=max_num_of_faces)
     else:
-        detector = af.SyncFrameDetector(data_dir, max_num_of_faces)
+        baseline_mode = args.baseline_mode if args.baseline_mode is not None else is_input_a_video(input_file)
+        detector = af.SyncFrameDetector(data_dir, 
+                                        af.BaselineMode.ON if baseline_mode else af.BaselineMode.OFF, 
+                                        max_num_faces=max_num_of_faces)
 
     fps = 30
     if args.video:
@@ -124,6 +132,16 @@ def run(csv_data):
     else:
         if not csv_file == DEFAULT_FILE_NAME:
             write_csv_data_to_file(csv_data, csv_file)
+
+def is_input_a_video(input_file):
+    capture_file = cv2.VideoCapture(input_file)
+    if capture_file.isOpened():
+        # if we successfully read two frames from this file, we can assume it is a video (as opposed to an image)
+        _, _ = capture_file.read()
+        ret, frame = capture_file.read()
+        return ret
+    else:
+        return False
 
 def process_face_input(detector, capture_file, input_file, start_time, output_file, out, logo, args):
     count = 0
@@ -191,7 +209,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 if output_file is not None:
                     out.write(frame)
 
-                if cv2.waitKey(1) == 27:
+                waitkey_delay = 1 if is_input_a_video(input_file) else 0
+                if cv2.waitKey(waitkey_delay) == 27:
                     break
             else:
                 print("skipped a frame due to the timestamp not incrementing - old timestamp %f, current timestamp %f" %
@@ -301,6 +320,7 @@ def parse_command_line():
     parser.add_argument("-r", "--resolution", dest='res', metavar=('width', 'height'), nargs=2, default=[1920, 1080],
                         help="resolution in pixels (2-values): width height")
     parser.add_argument("--no-draw", dest="no_draw", action='store_true', help="Don't draw window while processing video, default is set to False")
+    parser.add_argument("--baseline_mode", dest="baseline_mode", required=False, type=lambda x: x.lower() == 'true')
     args = parser.parse_args()
     return parser, args
 
