@@ -134,7 +134,6 @@ def run(csv_data):
         process_body_input(detector, capture_file, input_file, start_time, output_file, out, logo, args)
 
     capture_file.release()
-    cv2.destroyAllWindows()
 
     # If video file is provided as an input
     if not isinstance(input_file, int):
@@ -235,8 +234,6 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
                 if output_file is not None:
                     out.write(frame)
 
-                if cv2.waitKey(1) == 27:
-                    break
             else:
                 print("skipped a frame due to the timestamp not incrementing - old timestamp %f, current timestamp %f" %
                       (last_timestamp, curr_timestamp))
@@ -315,8 +312,6 @@ def process_object_input(detector, capture_file, input_file, start_time, output_
                 if output_file is not None:
                     out.write(frame)
 
-                if cv2.waitKey(1) == 27:
-                    break
             else:
                 print("skipped a frame due to the timestamp not incrementing - old timestamp %f, new timestamp %f" % (
                     last_timestamp, curr_timestamp))
@@ -394,8 +389,6 @@ def process_occupant_input(detector, capture_file, input_file, start_time, outpu
                 if output_file is not None:
                     out.write(frame)
 
-                if cv2.waitKey(1) == 27:
-                    break
             else:
                 print("skipped a frame due to the timestamp not incrementing - old timestamp %f, new timestamp %f" % (
                     last_timestamp, curr_timestamp))
@@ -459,8 +452,6 @@ def process_body_input(detector, capture_file, input_file, start_time, output_fi
                 if output_file is not None:
                     out.write(frame)
 
-                if cv2.waitKey(1) == 27:
-                    break
             else:
                 print("skipped a frame due to the timestamp not incrementing - old timestamp %f, new timestamp %f" % (
                     last_timestamp, curr_timestamp))
@@ -767,7 +758,7 @@ def get_command_line_parameters(parser, args):
         # If it's not set, enabling the identity or appearances feature on the detector will will fail, and the error
         # isn't that helpful.
         ld_library_path = os.environ.get("LD_LIBRARY_PATH")
-        if (not ld_library_path or not os.path.isfile(ld_library_path + "/libaffectiva-vision.so")):
+        if (not ld_library_path):
             print("When enabling face-based features, you must export the LD_LIBRARY_PATH environment variable as shown below:")
             print("    export LD_LIBRARY_PATH=" + os.path.dirname(os.path.realpath(af.__file__)) + "/lib")
             exit(1)
