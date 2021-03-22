@@ -171,7 +171,7 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
             if curr_timestamp > last_timestamp or count == 0:  # if there's a problem with the timestamp, don't process the frame
 
                 last_timestamp = curr_timestamp
-                afframe = af.Frame(width, height, frame, af.Frame.ColorFormat.bgr, int(curr_timestamp))
+                afframe = af.Frame(width, height, frame, int(curr_timestamp), af.Frame.ColorFormat.bgr, af.Frame.Rotation.upright)
                 count += 1
 
                 try:
