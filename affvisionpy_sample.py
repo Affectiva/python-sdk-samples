@@ -22,13 +22,11 @@ DEFAULT_FILE_NAME = "default"
 DATA_DIR_ENV_VAR = "AFFECTIVA_VISION_DATA_DIR"
 
 HEADER_ROW_FACES = ['TimeStamp', 'faceId', 'upperLeftX', 'upperLeftY', 'lowerRightX', 'lowerRightY', 'confidence',
-                    'interocular_distance',
-                    'pitch', 'yaw', 'roll', 'joy', 'anger', 'surprise', 'valence', 'fear', 'sadness', 'disgust',
-                    'neutral', 'contempt', 'smile',
-                    'brow_raise', 'brow_furrow', 'nose_wrinkle', 'upper_lip_raise', 'mouth_open', 'eye_closure',
-                    'cheek_raise', 'lid_tighten', 'yawn',
-                    'blink', 'blink_rate', 'eye_widen', 'inner_brow_raise', 'lip_corner_depressor',
-                    'attention', 'jaw_drop', 'smirk', 'chain_raise', 'engagement', 'lip_pucker', 'dimpler', 'lip_stretch', 'lip_press', 'lip_suck'
+                    'interocular_distance', 'pitch', 'yaw', 'roll', 'joy', 'anger', 'surprise', 'valence', 'fear',
+                    'sadness', 'disgust', 'neutral', 'contempt', 'smile', 'brow_raise', 'brow_furrow', 'nose_wrinkle',
+                    'upper_lip_raise', 'mouth_open', 'eye_closure', 'cheek_raise', 'lid_tighten', 'blink', 'blink_rate',
+                    'eye_widen', 'inner_brow_raise', 'lip_corner_depressor', 'attention', 'jaw_drop', 'smirk', 'chain_raise',
+                    'engagement', 'lip_pucker', 'dimpler', 'lip_stretch', 'lip_press', 'lip_suck'
                     ]
 
 header_row = []
