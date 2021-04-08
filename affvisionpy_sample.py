@@ -9,7 +9,7 @@ import affvisionpy as af
 import cv2
 import math
 
-from face_listener import FaceListener as ImageListener
+from face_listener import FaceListener as FaceListener
 
 from display_metrics import (draw_metrics, check_bounding_box_outside, draw_bounding_box, draw_affectiva_logo,
                              get_affectiva_logo, get_bounding_box_points)
@@ -148,8 +148,8 @@ def process_face_input(detector, capture_file, input_file, start_time, output_fi
     features = {af.Feature.expressions, af.Feature.emotions}
     detector.enable_features(features)
 
-    listener = ImageListener()
-    detector.set_image_listener(listener)
+    listener = FaceListener()
+    detector.set_face_listener(listener)
 
     detector.start()
 
